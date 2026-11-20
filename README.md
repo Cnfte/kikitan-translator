@@ -8,7 +8,7 @@
 <img src="https://i.imgur.com/l7NBjqk.png" alt="Buy Me a Coffee" width="150" height="45" align="center">
 </a>
 <br><br>
-<img width=500 src="https://i.imgur.com/C9fSR9O.png" />
+<img width=500 src="[https://i.imgur.com/C9fSR9O.png](https://img.cdn1.vip/i/6b0053cf26641_1795183567.webp)" />
 </div>
 
 > **著作权与上游声明 / Copyright & Attribution**

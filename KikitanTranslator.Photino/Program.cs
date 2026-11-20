@@ -84,6 +84,7 @@ public class Program
         var window = new PhotinoWindow()
             .SetTitle(windowTitle)
             .SetUseOsDefaultSize(false)
+            .SetUseOsDefaultLocation(false)
             .SetMinSize(minWidth, minHeight)
 #if DEBUG
             .SetIconFile($"Resources/wwwroot/{iconFile}")
@@ -93,6 +94,7 @@ public class Program
             .SetIconFile(Path.Combine(AppContext.BaseDirectory, "wwwroot", iconFile))
 #endif
             .SetSize(new Size(width, height))
+            .SetChromeless(true)
             .SetTransparent(true)
             .Center()
             .SetResizable(true)
@@ -483,16 +485,24 @@ public class Program
         {
             const int GWL_STYLE = -16;
             const int GWL_EXSTYLE = -20;
+            const int WS_POPUP = unchecked((int)0x80000000);
             const int WS_CLIPCHILDREN = 0x02000000;
             const int WS_CAPTION = 0x00C00000;
             const int WS_SYSMENU = 0x00080000;
+            const int WS_THICKFRAME = 0x00040000;
+            const int WS_MINIMIZEBOX = 0x00020000;
+            const int WS_MAXIMIZEBOX = 0x00010000;
             const int WS_EX_LAYERED = 0x00080000;
+            const int WS_EX_APPWINDOW = 0x00040000;
+            const int WS_EX_WINDOWEDGE = 0x00000100;
 
-            // Keep WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_CLIPCHILDREN for borderless
-            // resize, Snap, and Acrylic, while stripping WS_CAPTION | WS_SYSMENU so Windows 11 DWM
-            // never renders duplicate native minimize/maximize/close glyphs over our custom header.
+            // Use WS_POPUP + WS_CLIPCHILDREN | WS_MINIMIZEBOX | WS_MAXIMIZEBOX while stripping
+            // WS_CAPTION | WS_SYSMENU | WS_THICKFRAME so Windows 11 DWM never allocates a 29px
+            // non-client caption plate (CapBounds == 0) or duplicate native caption glyphs.
+            // Edge drag-resize works explicitly via WM_NCLBUTTONDOWN(HTLEFT..HTBOTTOMRIGHT).
             int style = GetWindowLong(hwnd, GWL_STYLE);
-            int targetStyle = (style | WS_CLIPCHILDREN) & ~(WS_CAPTION | WS_SYSMENU);
+            int targetStyle = (style | WS_POPUP | WS_CLIPCHILDREN | WS_MINIMIZEBOX | WS_MAXIMIZEBOX)
+                & ~(WS_CAPTION | WS_SYSMENU | WS_THICKFRAME);
             if (targetStyle != style)
             {
                 SetWindowLong(hwnd, GWL_STYLE, targetStyle);
@@ -500,11 +510,12 @@ public class Program
 
             // Photino creates transparent windows with WS_EX_LAYERED; on Windows 11 DWM / WebView2
             // this freezes the hit-test / layered redirection boundary at the initial 900px width
-            // after stretching rightward. Acrylic + DwmExtendFrameIntoClientArea(-1) do not need it.
+            // after stretching rightward. Also ensure WS_EX_APPWINDOW stays set for WS_POPUP.
             int exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
-            if ((exStyle & WS_EX_LAYERED) != 0)
+            int targetExStyle = (exStyle | WS_EX_APPWINDOW) & ~(WS_EX_LAYERED | WS_EX_WINDOWEDGE);
+            if (targetExStyle != exStyle)
             {
-                SetWindowLong(hwnd, GWL_EXSTYLE, exStyle & ~WS_EX_LAYERED);
+                SetWindowLong(hwnd, GWL_EXSTYLE, targetExStyle);
             }
 
             _windowSubclassProc = BorderlessFrameSubclassProc;

@@ -158,9 +158,13 @@ public class Program
         {
             if (windowInitialized && !connector.WindowClosing)
             {
-                lastZoomedState = false;
-                if (OperatingSystem.IsWindows()) UiDebugLog.LogWindowGeometry(window.WindowHandle, "Event:WindowRestored");
-                connector.Send(Newtonsoft.Json.JsonConvert.SerializeObject(new Message { Method = "window_state", Data = "restored" }));
+                bool zoomed = OperatingSystem.IsWindows() && IsZoomed(window.WindowHandle);
+                if (!zoomed && lastZoomedState)
+                {
+                    lastZoomedState = false;
+                    if (OperatingSystem.IsWindows()) UiDebugLog.LogWindowGeometry(window.WindowHandle, "Event:WindowRestored");
+                    connector.Send(Newtonsoft.Json.JsonConvert.SerializeObject(new Message { Method = "window_state", Data = "restored" }));
+                }
             }
         };
         
@@ -335,6 +339,12 @@ public class Program
     [DllImport("user32.dll")]
     private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
 
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongW")]
+    private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongW")]
+    private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+
     [DllImport("user32.dll")]
     private static extern uint GetDpiForWindow(IntPtr hWnd);
 
@@ -361,6 +371,7 @@ public class Program
     private static IntPtr BorderlessFrameSubclassProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, UIntPtr uIdSubclass, UIntPtr dwRefData)
     {
         const uint WM_SIZE = 0x0005;
+        const uint WM_ERASEBKGND = 0x0014;
         const uint WM_GETMINMAXINFO = 0x0024;
         const uint WM_NCDESTROY = 0x0082;
         const uint WM_NCCALCSIZE = 0x0083;
@@ -369,6 +380,13 @@ public class Program
         const int SM_CXSIZEFRAME = 32;
         const int SM_CYSIZEFRAME = 33;
         const int SM_CXPADDEDBORDER = 92;
+
+        if (uMsg == WM_ERASEBKGND)
+        {
+            // Suppress GDI background brush erase during horizontal/vertical drags to prevent
+            // flashing behind the asynchronously resizing WebView2 D3D swapchain.
+            return (IntPtr)1;
+        }
 
         if (uMsg == WM_NCDESTROY)
         {
@@ -437,6 +455,14 @@ public class Program
     {
         try
         {
+            const int GWL_STYLE = -16;
+            const int WS_CLIPCHILDREN = 0x02000000;
+            int style = GetWindowLong(hwnd, GWL_STYLE);
+            if ((style & WS_CLIPCHILDREN) == 0)
+            {
+                SetWindowLong(hwnd, GWL_STYLE, style | WS_CLIPCHILDREN);
+            }
+
             _windowSubclassProc = BorderlessFrameSubclassProc;
             if (SetWindowSubclass(hwnd, _windowSubclassProc, (UIntPtr)1, UIntPtr.Zero))
             {

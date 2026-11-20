@@ -168,7 +168,7 @@ export default function Kikitan({ state }: { state: app_state }) {
         <div className="flex flex-col flex-1 h-full min-h-0 w-full max-w-full gap-3 justify-between select-none font-sans overflow-hidden">
             
             {/* 1. Spacious Apple Translate Dual Stage (No nested inner boxes) */}
-            <div className="grid grid-cols-[minmax(0,1fr),auto,minmax(0,1fr)] gap-2.5 sm:gap-3 items-stretch flex-1 min-h-0 min-w-0">
+            <div data-telemetry="stage-grid" className="grid grid-cols-[minmax(0,1fr),auto,minmax(0,1fr)] gap-2.5 sm:gap-3 items-stretch flex-1 min-h-0 min-w-0">
                 
                 {/* Left Stage: Source Speech Recognition */}
                 <section className="liquid-glass-regular rounded-3xl px-4 py-4 md:px-6 md:py-5 flex flex-col justify-between min-h-0 flex-1 min-w-0">
@@ -330,7 +330,7 @@ export default function Kikitan({ state }: { state: app_state }) {
             </div>
 
             {/* 2. Unified Apple Floating Control Dock */}
-            <div className="liquid-glass-regular rounded-2xl px-2.5 sm:px-3.5 py-2 flex items-center gap-2 sm:gap-2.5 shrink-0 min-w-0">
+            <div data-telemetry="control-dock" className="liquid-glass-regular rounded-2xl px-2.5 sm:px-3.5 py-2 flex items-center gap-2 sm:gap-2.5 shrink-0 min-w-0">
                 
                 {/* Master Start / Stop Capsule Button */}
                 <button

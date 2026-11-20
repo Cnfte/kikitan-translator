@@ -36,6 +36,10 @@ export function init() {
             pendingRequests.delete(response.method);
 
             return
+        } else if (response.method == "window_state") {
+            windowStateCallback?.(response.data);
+
+            return;
         }
 
         const data = JSON.parse(response.data);
@@ -49,10 +53,6 @@ export function init() {
             return;
         } else if (response.method == "notification") {
             notificationCallback?.(data.msg, data.level);
-
-            return;
-        } else if (response.method == "window_state") {
-            windowStateCallback?.(response.data);
 
             return;
         }

@@ -140,19 +140,21 @@ function App() {
             const docEl = document.documentElement;
             const header = document.querySelector("header");
             const main = document.querySelector("main");
-            const stageGrid = main?.querySelector("div > div.grid") ?? null;
+            const stageGrid = main?.querySelector('[data-telemetry="stage-grid"]') ?? null;
             const sections = stageGrid ? Array.from(stageGrid.querySelectorAll(":scope > section")) : [];
-            const dock = main?.querySelector("div > div:last-child") ?? null;
+            const dock = main?.querySelector('[data-telemetry="control-dock"]') ?? null;
 
             const overflows: Array<{ tag: string; cls: string; l: number; r: number; sw: number; cw: number }> = [];
-            document.querySelectorAll("header, main, section, button, input, .MuiSelect-select").forEach((el) => {
-                const r = el.getBoundingClientRect();
+            document.querySelectorAll("header, header > div, main, section, button, input, .MuiSelect-select").forEach((el) => {
                 const he = el as HTMLElement;
+                const cls = typeof he.className === "string" ? he.className : "";
+                if (cls.includes("MuiSelect-nativeInput")) return;
+                const r = el.getBoundingClientRect();
                 if (r.width > 0 && (r.right > window.innerWidth + 1 || r.left < -1 || (he.scrollWidth > he.clientWidth + 3 && getComputedStyle(he).overflowX !== "hidden"))) {
                     if (overflows.length < 6) {
                         overflows.push({
                             tag: el.tagName,
-                            cls: (typeof he.className === "string" ? he.className : "").slice(0, 48),
+                            cls: cls.slice(0, 48),
                             l: Math.round(r.left),
                             r: Math.round(r.right),
                             sw: he.scrollWidth,
@@ -470,13 +472,13 @@ function App() {
                             className="liquid-glass-regular px-3.5 md:px-4 py-2 rounded-2xl flex md:grid md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center justify-between z-10 shrink-0 cursor-default select-none gap-2 w-full"
                         >
                             {/* Left: Brand Identity + Live Status & OSC Pill */}
-                            <div className="flex items-center justify-start gap-2 min-w-0">
+                            <div className="flex items-center justify-start gap-2 min-w-0 overflow-hidden">
                                 <div className="flex items-baseline gap-1.5 shrink-0">
                                     <span className="text-[15px] tracking-tight font-semibold apple-text-primary">Kikitan</span>
                                     <button
                                         onClick={() => setChangelogsVisible(true)}
                                         onMouseDown={(e) => e.stopPropagation()}
-                                        className="hidden sm:inline text-[11px] font-mono apple-text-tertiary hover:apple-text-primary transition-colors cursor-pointer"
+                                        className="hidden lg:inline text-[11px] font-mono apple-text-tertiary hover:apple-text-primary transition-colors cursor-pointer"
                                     >
                                         v{appVersion}
                                     </button>
@@ -491,7 +493,7 @@ function App() {
                                         ? (localization.listening_active?.[appState.config.language] ?? "监听翻译中")
                                         : (localization.listening_idle?.[appState.config.language] ?? "待机")}
                                 >
-                                    <div className={`flex items-center gap-1.5 px-2 py-1 md:px-2.5 md:py-0.5 rounded-full text-[11px] font-medium shrink-0 ${
+                                    <div className={`flex items-center gap-1.5 px-2 py-1 md:px-2.5 md:py-0.5 rounded-full text-[11px] font-medium min-w-0 max-w-full overflow-hidden ${
                                         appState.is_muted
                                             ? "badge-pastel-yellow"
                                             : isRunning
@@ -505,7 +507,7 @@ function App() {
                                                     ? "bg-emerald-400 animate-pulse"
                                                     : "bg-zinc-400"
                                         }`} />
-                                        <span className="hidden md:inline whitespace-nowrap">
+                                        <span className="hidden md:inline truncate min-w-0">
                                             {appState.is_muted
                                                 ? (localization.status_muted_warning?.[appState.config.language] ?? "VRChat 静音")
                                                 : isRunning

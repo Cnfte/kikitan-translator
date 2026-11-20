@@ -16,7 +16,7 @@ export default function QuickstartMenu({ state }: { state: app_state }) {
     const [quickstartPage, setQuickstartPage] = React.useState(0);
 
     return (
-        <div className="flex flex-col justify-between w-11/12 max-w-[760px] h-[540px] liquid-glass-regular rounded-3xl border border-white/16 shadow-[0_24px_64px_rgba(0,0,0,0.65),inset_0_1px_1px_rgba(255,255,255,0.22)] p-7 select-none font-sans">
+        <div className="flex flex-col justify-between w-11/12 max-w-[760px] h-[540px] max-h-[84vh] liquid-glass-regular rounded-3xl border border-white/16 shadow-[0_24px_64px_rgba(0,0,0,0.65),inset_0_1px_1px_rgba(255,255,255,0.22)] p-6 md:p-7 select-none font-sans overflow-hidden">
             <div className="relative flex-1 flex flex-col justify-center items-center">
                 
                 {/* Page 0: Language Select */}
@@ -51,7 +51,7 @@ export default function QuickstartMenu({ state }: { state: app_state }) {
                 <div className={`absolute inset-0 transition-opacity duration-200 flex flex-col items-center justify-center ${quickstartPage === 1 ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
                     <p className="text-base font-semibold text-white tracking-tight mb-3">{localization.quickstart_osc[state.config.language]}</p>
                     {quickstartPage === 1 && (
-                        <video width={420} autoPlay loop className="rounded-xl border border-white/12 shadow-[0_8px_32px_rgba(0,0,0,0.35)]">
+                        <video className="w-full max-w-[420px] rounded-xl border border-white/12 shadow-[0_8px_32px_rgba(0,0,0,0.35)]" autoPlay loop>
                             <source src="/OSC.mp4" type="video/mp4"></source>
                         </video>
                     )}
@@ -60,7 +60,7 @@ export default function QuickstartMenu({ state }: { state: app_state }) {
                 {/* Page 2: Mode Selection */}
                 <div className={`absolute inset-0 transition-opacity duration-200 flex flex-col items-center justify-center ${quickstartPage === 2 ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
                     <p className="text-base font-semibold text-white tracking-tight mb-2">{localization.mode_selection[state.config.language]}</p>
-                    <img className="w-[340px] rounded-xl border border-white/12 shadow-[0_8px_32px_rgba(0,0,0,0.35)]" src={
+                    <img className="w-full max-w-[340px] rounded-xl border border-white/12 shadow-[0_8px_32px_rgba(0,0,0,0.35)]" src={
                         {
                             en: "/images/en.png",
                             jp: "/images/jp.png",
@@ -74,7 +74,7 @@ export default function QuickstartMenu({ state }: { state: app_state }) {
                 {/* Page 3: Desktop Audio */}
                 <div className={`absolute inset-0 transition-opacity duration-200 flex flex-col items-center justify-center ${quickstartPage === 3 ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
                     <p className="text-base font-semibold text-white tracking-tight mb-2">{localization.desktop_translation[state.config.language]}</p>
-                    <img className="w-[340px] rounded-xl border border-white/12 shadow-[0_8px_32px_rgba(0,0,0,0.35)]" src={
+                    <img className="w-full max-w-[340px] rounded-xl border border-white/12 shadow-[0_8px_32px_rgba(0,0,0,0.35)]" src={
                         {
                             en: "/images/en2.png",
                             jp: "/images/jp2.png",
@@ -88,7 +88,7 @@ export default function QuickstartMenu({ state }: { state: app_state }) {
                 {/* Page 4: Settings Intro */}
                 <div className={`absolute inset-0 transition-opacity duration-200 flex flex-col items-center justify-center ${quickstartPage === 4 ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
                     <p className="text-base font-semibold text-white tracking-tight mb-2">{localization.settings[state.config.language]}</p>
-                    <img className="w-[340px] rounded-xl border border-white/12 shadow-[0_8px_32px_rgba(0,0,0,0.35)]" src="/images/settings.png" />
+                    <img className="w-full max-w-[340px] rounded-xl border border-white/12 shadow-[0_8px_32px_rgba(0,0,0,0.35)]" src="/images/settings.png" />
                     <p className="text-xs text-zinc-300 mt-3 text-center max-w-md leading-relaxed">{localization.settings_details[state.config.language]}</p>
                 </div>
 
@@ -96,7 +96,7 @@ export default function QuickstartMenu({ state }: { state: app_state }) {
                 <div className={`absolute inset-0 transition-opacity duration-200 flex flex-col items-center justify-center ${quickstartPage === 5 ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
                     <p className="text-base font-semibold text-white tracking-tight mb-2">{localization.change_theme[state.config.language]}</p>
                     {quickstartPage === 5 && (
-                        <video width={340} autoPlay loop className="rounded-xl border border-white/12 shadow-[0_8px_32px_rgba(0,0,0,0.35)]">
+                        <video className="w-full max-w-[340px] rounded-xl border border-white/12 shadow-[0_8px_32px_rgba(0,0,0,0.35)]" autoPlay loop>
                             <source src="/theme.mp4" type="video/mp4"></source>
                         </video>
                     )}

@@ -149,13 +149,16 @@ export default function Kikitan({ state }: { state: app_state }) {
 
     const cleanSelectSx = {
         height: 32,
-        minWidth: 118,
+        minWidth: 88,
+        maxWidth: "100%",
+        flexShrink: 1,
         fontWeight: 600,
-        fontSize: "0.84rem",
+        fontSize: "0.82rem",
         color: "var(--text-primary)",
         bgcolor: "rgba(var(--glass-clear-rgb), 0.08)",
         borderRadius: "9999px",
         px: 0.5,
+        "& .MuiSelect-select": { minWidth: "0 !important", overflow: "hidden", textOverflow: "ellipsis" },
         "& .MuiOutlinedInput-notchedOutline": { border: "1px solid var(--border-glass)" },
         "&:hover .MuiOutlinedInput-notchedOutline": { border: "1px solid var(--border-glass-strong)" },
         "&.Mui-focused .MuiOutlinedInput-notchedOutline": { border: "1px solid var(--accent-blue)" },
@@ -165,15 +168,15 @@ export default function Kikitan({ state }: { state: app_state }) {
         <div className="flex flex-col flex-1 h-full min-h-0 w-full max-w-full gap-3 justify-between select-none font-sans overflow-hidden">
             
             {/* 1. Spacious Apple Translate Dual Stage (No nested inner boxes) */}
-            <div className="grid grid-cols-[minmax(0,1fr),auto,minmax(0,1fr)] gap-3 items-stretch flex-1 min-h-0 min-w-0">
+            <div className="grid grid-cols-[minmax(0,1fr),auto,minmax(0,1fr)] gap-2.5 sm:gap-3 items-stretch flex-1 min-h-0 min-w-0">
                 
                 {/* Left Stage: Source Speech Recognition */}
-                <section className="liquid-glass-regular rounded-3xl px-6 py-5 flex flex-col justify-between min-h-0 flex-1 min-w-0">
+                <section className="liquid-glass-regular rounded-3xl px-4 py-4 md:px-6 md:py-5 flex flex-col justify-between min-h-0 flex-1 min-w-0">
                     
                     {/* Top Row: Source Language & AI Semantic Correction Pill */}
-                    <div className="flex items-center justify-between gap-2 shrink-0">
-                        <div className="flex items-center gap-2">
-                            <span className="w-7 h-7 rounded-full liquid-glass-clear flex items-center justify-center apple-text-secondary">
+                    <div className="flex items-center justify-between gap-2 shrink-0 min-w-0">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <span className="w-7 h-7 rounded-full liquid-glass-clear flex items-center justify-center apple-text-secondary shrink-0">
                                 <MicIcon sx={{ fontSize: 16 }} />
                             </span>
                             <Select
@@ -193,7 +196,7 @@ export default function Kikitan({ state }: { state: app_state }) {
                         <Tooltip title={localization.ai_semantic_correction_desc?.[state.config.language] ?? "语音识别后由AI修正同音错字再翻译"}>
                             <button
                                 onClick={() => setConfig("ai_semantic_correction", !state.config.ai_semantic_correction)}
-                                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap shrink-0 transition-all ${
                                     state.config.ai_semantic_correction
                                         ? "badge-pastel-blue font-semibold"
                                         : "liquid-glass-clear apple-text-secondary hover:apple-text-primary"
@@ -206,9 +209,9 @@ export default function Kikitan({ state }: { state: app_state }) {
                     </div>
 
                     {/* Center Canvas: Generous Typography without Box-inside-Box */}
-                    <div className="flex-1 min-h-0 flex flex-col justify-center py-4 overflow-y-auto">
+                    <div className="flex-1 min-h-0 min-w-0 flex flex-col justify-center py-4 overflow-y-auto">
                         {detection ? (
-                            <p className={`text-xl md:text-2xl font-medium tracking-tight leading-relaxed apple-text-primary select-text break-words ${detecting ? "opacity-75" : ""}`}>
+                            <p className={`w-full min-w-0 text-xl md:text-2xl font-medium tracking-tight leading-relaxed apple-text-primary select-text break-words ${detecting ? "opacity-75" : ""}`}>
                                 {detection}
                             </p>
                         ) : (
@@ -227,10 +230,10 @@ export default function Kikitan({ state }: { state: app_state }) {
                     </div>
 
                     {/* Subtle Caption Footer */}
-                    <div className="flex items-center justify-between text-[11px] apple-text-tertiary pt-2 border-t apple-divider shrink-0">
-                        <span>{localization.recognized_text?.[state.config.language] ?? "语音识别 (原文)"}</span>
+                    <div className="flex items-center justify-between gap-2 text-[11px] apple-text-tertiary pt-2 border-t apple-divider shrink-0 min-w-0">
+                        <span className="truncate">{localization.recognized_text?.[state.config.language] ?? "语音识别 (原文)"}</span>
                         {state.config.ai_semantic_correction && (
-                            <span className="font-mono text-[10px] text-[var(--accent-blue)] font-medium">
+                            <span className="hidden md:inline font-mono text-[10px] text-[var(--accent-blue)] font-medium whitespace-nowrap shrink-0">
                                 STT / AI CORRECTION / TRANSLATE
                             </span>
                         )}
@@ -238,7 +241,7 @@ export default function Kikitan({ state }: { state: app_state }) {
                 </section>
 
                 {/* Center Language Swap Trigger */}
-                <div className="flex flex-col items-center justify-center">
+                <div className="flex flex-col items-center justify-center shrink-0">
                     <Tooltip title={localization.swap_languages?.[state.config.language] ?? "互换语言"}>
                         <button
                             onClick={() => {
@@ -246,7 +249,7 @@ export default function Kikitan({ state }: { state: app_state }) {
                                 setConfig("source_language", state.config.target_language);
                                 setConfig("target_language", prevSource);
                             }}
-                            className="w-10 h-10 rounded-full liquid-glass-regular hover:bg-[var(--accent-blue)] hover:!text-white apple-text-secondary flex items-center justify-center transition-all shadow-sm"
+                            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full liquid-glass-regular hover:bg-[var(--accent-blue)] hover:!text-white apple-text-secondary flex items-center justify-center transition-all shadow-sm"
                         >
                             <SwapHorizIcon sx={{ fontSize: 19 }} />
                         </button>
@@ -254,12 +257,12 @@ export default function Kikitan({ state }: { state: app_state }) {
                 </div>
 
                 {/* Right Stage: Target Translation Output */}
-                <section className="liquid-glass-regular rounded-3xl px-6 py-5 flex flex-col justify-between min-h-0 flex-1 min-w-0">
+                <section className="liquid-glass-regular rounded-3xl px-4 py-4 md:px-6 md:py-5 flex flex-col justify-between min-h-0 flex-1 min-w-0">
                     
                     {/* Top Row: Target Language & Copy Action */}
-                    <div className="flex items-center justify-between gap-2 shrink-0">
-                        <div className="flex items-center gap-2">
-                            <span className="w-7 h-7 rounded-full liquid-glass-clear flex items-center justify-center apple-text-secondary">
+                    <div className="flex items-center justify-between gap-2 shrink-0 min-w-0">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <span className="w-7 h-7 rounded-full liquid-glass-clear flex items-center justify-center apple-text-secondary shrink-0">
                                 <TranslateIcon sx={{ fontSize: 15 }} />
                             </span>
                             <Select
@@ -279,7 +282,7 @@ export default function Kikitan({ state }: { state: app_state }) {
                         <button
                             disabled={!translation}
                             onClick={() => handleCopy(translation)}
-                            className="liquid-glass-clear flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium apple-text-secondary hover:apple-text-primary disabled:opacity-35 transition-all"
+                            className="liquid-glass-clear flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full text-xs font-medium apple-text-secondary hover:apple-text-primary disabled:opacity-35 whitespace-nowrap shrink-0 transition-all"
                         >
                             {copied ? <CheckIcon sx={{ fontSize: 13, color: "var(--accent-green)" }} /> : <ContentCopyIcon sx={{ fontSize: 13 }} />}
                             <span>{copied ? "已复制" : "复制"}</span>
@@ -287,7 +290,7 @@ export default function Kikitan({ state }: { state: app_state }) {
                     </div>
 
                     {/* Center Canvas: Translation Output */}
-                    <div className="flex-1 min-h-0 flex flex-col justify-center py-4 overflow-y-auto">
+                    <div className="flex-1 min-h-0 min-w-0 flex flex-col justify-center py-4 overflow-y-auto">
                         {state.config.speech_to_text_only ? (
                             <div className="flex flex-col items-center justify-center text-center gap-2 my-auto max-w-sm mx-auto">
                                 <p className="text-sm font-medium apple-text-secondary">
@@ -298,7 +301,7 @@ export default function Kikitan({ state }: { state: app_state }) {
                                 </p>
                             </div>
                         ) : translation ? (
-                            <p className="text-xl md:text-2xl font-semibold tracking-tight leading-relaxed apple-text-primary select-text break-words">
+                            <p className="w-full min-w-0 text-xl md:text-2xl font-semibold tracking-tight leading-relaxed apple-text-primary select-text break-words">
                                 {translation}
                             </p>
                         ) : (
@@ -317,9 +320,9 @@ export default function Kikitan({ state }: { state: app_state }) {
                     </div>
 
                     {/* Subtle Caption Footer */}
-                    <div className="flex items-center justify-between text-[11px] apple-text-tertiary pt-2 border-t apple-divider shrink-0">
-                        <span>{localization.translated_text?.[state.config.language] ?? "翻译结果 (发送至 VRChat)"}</span>
-                        <span className="font-mono text-[10px]">
+                    <div className="flex items-center justify-between gap-2 text-[11px] apple-text-tertiary pt-2 border-t apple-divider shrink-0 min-w-0">
+                        <span className="truncate">{localization.translated_text?.[state.config.language] ?? "翻译结果 (发送至 VRChat)"}</span>
+                        <span className="hidden md:inline font-mono text-[10px] whitespace-nowrap shrink-0">
                             {state.config.send_to_chatbox ? "OSC CHATBOX SYNCED" : "OSC CHATBOX PAUSED"}
                         </span>
                     </div>
@@ -327,13 +330,13 @@ export default function Kikitan({ state }: { state: app_state }) {
             </div>
 
             {/* 2. Unified Apple Floating Control Dock */}
-            <div className="liquid-glass-regular rounded-2xl px-3.5 py-2 flex items-center gap-2.5 shrink-0">
+            <div className="liquid-glass-regular rounded-2xl px-2.5 sm:px-3.5 py-2 flex items-center gap-2 sm:gap-2.5 shrink-0 min-w-0">
                 
                 {/* Master Start / Stop Capsule Button */}
                 <button
                     disabled={isBusy}
                     onClick={() => controlKikitan(state.status == 0)}
-                    className={`h-9 px-4 rounded-full font-semibold text-xs flex items-center justify-center gap-1.5 transition-all shrink-0 ${
+                    className={`h-9 px-3 sm:px-4 rounded-full font-semibold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap transition-all shrink-0 ${
                         isRunning
                             ? "bg-[var(--pill-active-bg)] text-[var(--pill-active-fg)] shadow-sm"
                             : "bg-[var(--accent-blue)] text-white shadow-sm"
@@ -359,13 +362,15 @@ export default function Kikitan({ state }: { state: app_state }) {
                     size="small"
                     sx={{
                         height: 36,
-                        minWidth: 145,
-                        maxWidth: 210,
+                        minWidth: { xs: 100, sm: 135 },
+                        maxWidth: { xs: 145, md: 210 },
+                        flexShrink: 1,
                         fontSize: "0.76rem",
                         fontWeight: 500,
                         color: "var(--text-primary)",
                         bgcolor: "rgba(var(--glass-clear-rgb), 0.08)",
                         borderRadius: "9999px",
+                        "& .MuiSelect-select": { minWidth: "0 !important", overflow: "hidden", textOverflow: "ellipsis" },
                         "& .MuiOutlinedInput-notchedOutline": { border: "1px solid var(--border-glass)" },
                     }}
                     value={state.config.microphone || ""}
@@ -386,7 +391,7 @@ export default function Kikitan({ state }: { state: app_state }) {
                     <button
                         disabled={state.is_linux}
                         onClick={() => setConfig("desktop_translation", !state.config.desktop_translation)}
-                        className={`h-9 px-3 rounded-full flex items-center gap-1.5 text-xs font-medium shrink-0 transition-all ${
+                        className={`h-9 px-3 rounded-full flex items-center gap-1.5 text-xs font-medium whitespace-nowrap shrink-0 transition-all ${
                             state.config.desktop_translation
                                 ? "badge-pastel-blue font-semibold"
                                 : "liquid-glass-clear apple-text-secondary hover:apple-text-primary"
@@ -398,7 +403,7 @@ export default function Kikitan({ state }: { state: app_state }) {
                 </Tooltip>
 
                 {/* Integrated Apple iMessage-Style Input Capsule */}
-                <div className="flex-1 flex items-center h-9 rounded-full liquid-glass-well pl-4 pr-1 gap-2 min-w-0">
+                <div className="flex-1 flex items-center h-9 rounded-full liquid-glass-well pl-3.5 sm:pl-4 pr-1 gap-2 min-w-[90px]">
                     <input
                         type="text"
                         placeholder={localization.type_message_placeholder?.[state.config.language] ?? "输入内容并按 Enter 发送至 VRChat..."}
@@ -425,7 +430,7 @@ export default function Kikitan({ state }: { state: app_state }) {
                 <Tooltip title={localization.message_history[state.config.language]}>
                     <button
                         onClick={() => setShowMessageHistory(true)}
-                        className="liquid-glass-clear h-9 px-3 rounded-full text-xs font-medium apple-text-secondary hover:apple-text-primary flex items-center gap-1.5 shrink-0 transition-all"
+                        className="liquid-glass-clear h-9 px-3 rounded-full text-xs font-medium apple-text-secondary hover:apple-text-primary flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-all"
                     >
                         <HistoryIcon sx={{ fontSize: 16 }} />
                         <span className="font-mono text-[11px] font-semibold">

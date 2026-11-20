@@ -332,6 +332,7 @@ public class Program
     {
         const uint WM_NCDESTROY = 0x0082;
         const uint WM_NCCALCSIZE = 0x0083;
+        const int SM_CXSIZEFRAME = 32;
         const int SM_CYSIZEFRAME = 33;
         const int SM_CXPADDEDBORDER = 92;
 
@@ -346,22 +347,21 @@ public class Program
 
         if (uMsg == WM_NCCALCSIZE && wParam != IntPtr.Zero)
         {
-            var before = Marshal.PtrToStructure<NativeRect>(lParam);
-            int origTop = before.Top;
-            IntPtr result = DefSubclassProc(hWnd, uMsg, wParam, lParam);
-            var after = Marshal.PtrToStructure<NativeRect>(lParam);
             if (IsZoomed(hWnd))
             {
+                var rect = Marshal.PtrToStructure<NativeRect>(lParam);
                 uint dpi = GetDpiForWindow(hWnd);
-                int cyFrame = GetSystemMetricsForDpi(SM_CYSIZEFRAME, dpi) + GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi);
-                after.Top = origTop + cyFrame;
+                int pad = GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi);
+                int cxFrame = GetSystemMetricsForDpi(SM_CXSIZEFRAME, dpi) + pad;
+                int cyFrame = GetSystemMetricsForDpi(SM_CYSIZEFRAME, dpi) + pad;
+                rect.Left += cxFrame;
+                rect.Right -= cxFrame;
+                rect.Top += cyFrame;
+                rect.Bottom -= cyFrame;
+                Marshal.StructureToPtr(rect, lParam, false);
             }
-            else
-            {
-                after.Top = origTop;
-            }
-            Marshal.StructureToPtr(after, lParam, false);
-            return result;
+            // Return 0 so client area spans edge-to-edge cleanly without non-client caption or 8px Acrylic gap
+            return IntPtr.Zero;
         }
 
         return DefSubclassProc(hWnd, uMsg, wParam, lParam);

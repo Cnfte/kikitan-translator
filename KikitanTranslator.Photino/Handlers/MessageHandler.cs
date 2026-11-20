@@ -15,11 +15,18 @@ public class MessageHandler
 {
     private Dictionary<string, IHandler> _handlers = new();
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativePoint
+    {
+        public int X;
+        public int Y;
+    }
+
     [DllImport("user32.dll")]
     private static extern bool ReleaseCapture();
 
     [DllImport("user32.dll")]
-    private static extern IntPtr SendMessage(IntPtr hWnd, int Msg, IntPtr wParam, IntPtr lParam);
+    private static extern bool GetCursorPos(out NativePoint lpPoint);
 
     [DllImport("user32.dll")]
     private static extern bool IsZoomed(IntPtr hWnd);
@@ -29,6 +36,21 @@ public class MessageHandler
 
     [DllImport("user32.dll")]
     private static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+
+    private static void PostNonClientMouseDown(IntPtr hWnd, int hitTest)
+    {
+        try
+        {
+            ReleaseCapture();
+            IntPtr cursorParam = IntPtr.Zero;
+            if (GetCursorPos(out var pt))
+            {
+                cursorParam = (IntPtr)(((pt.Y & 0xFFFF) << 16) | (pt.X & 0xFFFF));
+            }
+            PostMessage(hWnd, 0x00A1 /* WM_NCLBUTTONDOWN */, (IntPtr)hitTest, cursorParam);
+        }
+        catch { }
+    }
 
     public void RegisterHandler(string methodName, IHandler handler) => _handlers.Add(methodName, handler);
 
@@ -48,12 +70,7 @@ public class MessageHandler
             {
                 if (conn.WindowHandle != null && conn.WebViewReady && !conn.WindowClosing && OperatingSystem.IsWindows())
                 {
-                    try
-                    {
-                        ReleaseCapture();
-                        SendMessage(conn.WindowHandle.WindowHandle, 0xA1, (IntPtr)0x2, IntPtr.Zero);
-                    }
-                    catch { }
+                    PostNonClientMouseDown(conn.WindowHandle.WindowHandle, 0x2 /* HTCAPTION */);
                 }
                 return null;
             }
@@ -64,12 +81,7 @@ public class MessageHandler
                 {
                     if (int.TryParse(m.Data, out int hitTest) && hitTest >= 10 && hitTest <= 17)
                     {
-                        try
-                        {
-                            ReleaseCapture();
-                            SendMessage(conn.WindowHandle.WindowHandle, 0xA1, (IntPtr)hitTest, IntPtr.Zero);
-                        }
-                        catch { }
+                        PostNonClientMouseDown(conn.WindowHandle.WindowHandle, hitTest);
                     }
                 }
                 return null;

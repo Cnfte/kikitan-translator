@@ -95,7 +95,7 @@ export default function SettingsPage({ closeCallback, state }: SettingsProps) {
         <div className="flex h-full w-full font-sans select-none overflow-hidden">
             
             {/* Left Sidebar: macOS System Settings Navigation */}
-            <aside className="w-60 shrink-0 border-r apple-divider p-4 flex flex-col justify-between bg-black/[0.06]">
+            <aside className="w-44 md:w-56 shrink-0 border-r apple-divider p-3 md:p-4 flex flex-col justify-between bg-black/[0.06]">
                 <div className="flex flex-col gap-1">
                     <div className="px-3 py-2 mb-1">
                         <h2 className="text-sm font-semibold tracking-tight apple-text-primary">
@@ -135,8 +135,8 @@ export default function SettingsPage({ closeCallback, state }: SettingsProps) {
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                 
                 {/* Top Sheet Bar */}
-                <div className="px-6 py-3.5 border-b apple-divider flex items-center justify-between shrink-0">
-                    <h3 className="text-sm font-semibold apple-text-primary">
+                <div className="px-5 md:px-6 py-3.5 border-b apple-divider flex items-center justify-between shrink-0">
+                    <h3 className="text-sm font-semibold apple-text-primary truncate">
                         {navItems[page]?.label}
                     </h3>
 
@@ -156,14 +156,14 @@ export default function SettingsPage({ closeCallback, state }: SettingsProps) {
                 </div>
 
                 {/* Scrollable Grouped Settings Content */}
-                <div className="flex-1 overflow-y-auto p-6">
+                <div className="flex-1 overflow-y-auto p-4 md:p-6">
                     
                     {/* Page 0: Appearance & Frosted Glass (0-100) */}
                     {page === 0 && (
                         <div className="flex flex-col gap-5 max-w-2xl">
                             
                             {/* Theme Material Selection */}
-                            <div className="liquid-glass-regular rounded-2xl p-5 flex flex-col gap-4">
+                            <div className="liquid-glass-regular rounded-2xl p-4 md:p-5 flex flex-col gap-4">
                                 <div>
                                     <p className="text-xs font-semibold apple-text-primary">
                                         {localization.theme_mode_label?.[lang] ?? "全局磨砂主题材质"}
@@ -173,10 +173,10 @@ export default function SettingsPage({ closeCallback, state }: SettingsProps) {
                                     </p>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <button
                                         onClick={() => setConfig("light_mode", false)}
-                                        className={`p-4 rounded-2xl border text-left flex items-center gap-3 transition-all ${
+                                        className={`p-3.5 md:p-4 rounded-2xl border text-left flex items-center gap-3 transition-all ${
                                             !state.config.light_mode
                                                 ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/15"
                                                 : "border-[var(--border-glass)] liquid-glass-well hover:border-[var(--border-glass-strong)]"
@@ -185,7 +185,7 @@ export default function SettingsPage({ closeCallback, state }: SettingsProps) {
                                         <div className="w-9 h-9 rounded-full bg-[#12141c] text-white border border-white/20 flex items-center justify-center shrink-0">
                                             <DarkModeIcon sx={{ fontSize: 18 }} />
                                         </div>
-                                        <div>
+                                        <div className="min-w-0">
                                             <p className="text-xs font-semibold apple-text-primary">
                                                 {localization.theme_dark_glass?.[lang] ?? "深邃暗色磨砂"}
                                             </p>
@@ -195,7 +195,7 @@ export default function SettingsPage({ closeCallback, state }: SettingsProps) {
 
                                     <button
                                         onClick={() => setConfig("light_mode", true)}
-                                        className={`p-4 rounded-2xl border text-left flex items-center gap-3 transition-all ${
+                                        className={`p-3.5 md:p-4 rounded-2xl border text-left flex items-center gap-3 transition-all ${
                                             state.config.light_mode
                                                 ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/15"
                                                 : "border-[var(--border-glass)] liquid-glass-well hover:border-[var(--border-glass-strong)]"
@@ -204,7 +204,7 @@ export default function SettingsPage({ closeCallback, state }: SettingsProps) {
                                         <div className="w-9 h-9 rounded-full bg-[#f4f6fb] text-[#1d1d1f] border border-black/15 flex items-center justify-center shrink-0">
                                             <LightModeIcon sx={{ fontSize: 18 }} />
                                         </div>
-                                        <div>
+                                        <div className="min-w-0">
                                             <p className="text-xs font-semibold apple-text-primary">
                                                 {localization.theme_light_glass?.[lang] ?? "冰晶浅色磨砂"}
                                             </p>
@@ -215,8 +215,8 @@ export default function SettingsPage({ closeCallback, state }: SettingsProps) {
                             </div>
 
                             {/* 0 - 100 Frosted Glass Opacity Slider */}
-                            <div className="liquid-glass-regular rounded-2xl p-5 flex flex-col gap-4">
-                                <div className="flex items-center justify-between">
+                            <div className="liquid-glass-regular rounded-2xl p-4 md:p-5 flex flex-col gap-4">
+                                <div className="flex items-center justify-between gap-2">
                                     <div>
                                         <p className="text-xs font-semibold apple-text-primary">
                                             {localization.glass_opacity_label?.[lang] ?? "磨砂背景透度调节 (0 - 100)"}
@@ -225,7 +225,7 @@ export default function SettingsPage({ closeCallback, state }: SettingsProps) {
                                             {localization.glass_opacity_desc?.[lang] ?? "实时调节全主题背景与面板的液态玻璃磨砂浓度"}
                                         </p>
                                     </div>
-                                    <span className="px-3 py-1 rounded-full text-xs font-mono font-semibold bg-[var(--accent-blue)] text-white">
+                                    <span className="px-3 py-1 rounded-full text-xs font-mono font-semibold bg-[var(--accent-blue)] text-white shrink-0">
                                         {currentOpacity}%
                                     </span>
                                 </div>
@@ -239,7 +239,7 @@ export default function SettingsPage({ closeCallback, state }: SettingsProps) {
                                         onChange={(e) => handleOpacitySlider(parseInt(e.target.value, 10))}
                                         className="apple-slider"
                                     />
-                                    <div className="flex justify-between text-[10px] font-mono apple-text-tertiary mt-1.5">
+                                    <div className="hidden md:flex justify-between text-[10px] font-mono apple-text-tertiary mt-1.5">
                                         <span>0% (全透视桌面)</span>
                                         <span>25% (轻盈磨砂)</span>
                                         <span>55% (标准均衡)</span>
@@ -248,7 +248,7 @@ export default function SettingsPage({ closeCallback, state }: SettingsProps) {
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-5 gap-2 pt-1">
+                                <div className="flex flex-wrap gap-1.5 sm:gap-2 pt-1">
                                     {[
                                         { val: 0, text: "0% 极透" },
                                         { val: 25, text: "25% 轻透" },
@@ -259,7 +259,7 @@ export default function SettingsPage({ closeCallback, state }: SettingsProps) {
                                         <button
                                             key={preset.val}
                                             onClick={() => handleOpacitySlider(preset.val)}
-                                            className={`py-1.5 rounded-xl text-xs font-mono transition-all ${
+                                            className={`flex-1 min-w-[72px] py-1.5 px-2 rounded-xl text-[11px] sm:text-xs font-mono whitespace-nowrap transition-all ${
                                                 currentOpacity === preset.val
                                                     ? "bg-[var(--accent-blue)] text-white font-semibold"
                                                     : "liquid-glass-clear apple-text-secondary hover:apple-text-primary"
@@ -272,8 +272,8 @@ export default function SettingsPage({ closeCallback, state }: SettingsProps) {
                             </div>
 
                             {/* Interface Language */}
-                            <div className="liquid-glass-regular rounded-2xl p-5 flex items-center justify-between">
-                                <div>
+                            <div className="liquid-glass-regular rounded-2xl p-4 md:p-5 flex flex-wrap sm:flex-nowrap items-center justify-between gap-3">
+                                <div className="min-w-0">
                                     <p className="text-xs font-semibold apple-text-primary">
                                         {localization.language_settings[lang]}
                                     </p>
@@ -284,7 +284,7 @@ export default function SettingsPage({ closeCallback, state }: SettingsProps) {
 
                                 <Select
                                     size="small"
-                                    sx={{ minWidth: 150, fontSize: "0.82rem" }}
+                                    sx={{ minWidth: { xs: 130, sm: 150 }, fontSize: "0.82rem" }}
                                     value={state.config.language}
                                     onChange={(e) => setConfig("language", e.target.value)}
                                 >
@@ -300,9 +300,9 @@ export default function SettingsPage({ closeCallback, state }: SettingsProps) {
                     {/* Page 1: Speech & Translation Service Settings */}
                     {page === 1 && (
                         <div className="flex flex-col gap-5 max-w-2xl">
-                            <div className="liquid-glass-regular rounded-2xl p-5 flex flex-col gap-4">
-                                <div className="flex items-center justify-between gap-4">
-                                    <div>
+                            <div className="liquid-glass-regular rounded-2xl p-4 md:p-5 flex flex-col gap-4">
+                                <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3">
+                                    <div className="min-w-0">
                                         <p className="text-xs font-semibold apple-text-primary">
                                             {localization.translation_service[lang]}
                                         </p>
@@ -312,7 +312,7 @@ export default function SettingsPage({ closeCallback, state }: SettingsProps) {
                                     </div>
                                     <Select
                                         size="small"
-                                        sx={{ minWidth: 240, fontSize: "0.82rem" }}
+                                        sx={{ minWidth: { xs: 150, sm: 220 }, maxWidth: "100%", fontSize: "0.82rem" }}
                                         value={state.config.translator}
                                         onChange={(e) => {
                                             const value = e.target.value as number;
@@ -339,8 +339,8 @@ export default function SettingsPage({ closeCallback, state }: SettingsProps) {
                                     </Select>
                                 </div>
 
-                                <div className="border-t apple-divider pt-4 flex items-center justify-between gap-4">
-                                    <div>
+                                <div className="border-t apple-divider pt-4 flex flex-wrap sm:flex-nowrap items-center justify-between gap-3">
+                                    <div className="min-w-0">
                                         <p className="text-xs font-semibold apple-text-primary">
                                             {localization.recognition_service[lang]}
                                         </p>
@@ -350,7 +350,7 @@ export default function SettingsPage({ closeCallback, state }: SettingsProps) {
                                     </div>
                                     <Select
                                         size="small"
-                                        sx={{ minWidth: 240, fontSize: "0.82rem" }}
+                                        sx={{ minWidth: { xs: 150, sm: 220 }, maxWidth: "100%", fontSize: "0.82rem" }}
                                         value={state.config.recognizer}
                                         onChange={(e) => setConfig("recognizer", e.target.value)}
                                     >
@@ -362,9 +362,9 @@ export default function SettingsPage({ closeCallback, state }: SettingsProps) {
                             </div>
 
                             {/* AI Semantic Correction */}
-                            <div className="liquid-glass-regular rounded-2xl p-5 flex flex-col gap-4">
-                                <div className="flex items-center justify-between">
-                                    <div>
+                            <div className="liquid-glass-regular rounded-2xl p-4 md:p-5 flex flex-col gap-4">
+                                <div className="flex items-center justify-between gap-3">
+                                    <div className="min-w-0">
                                         <p className="text-xs font-semibold apple-text-primary">
                                             {localization.ai_semantic_correction?.[lang] ?? "AI 语义修正"}
                                         </p>
@@ -378,13 +378,13 @@ export default function SettingsPage({ closeCallback, state }: SettingsProps) {
                                     />
                                 </div>
 
-                                <div className="border-t apple-divider pt-4 flex items-center justify-between gap-4">
+                                <div className="border-t apple-divider pt-4 flex flex-wrap sm:flex-nowrap items-center justify-between gap-3">
                                     <span className="text-xs apple-text-secondary">
                                         {localization.ai_corrector_provider?.[lang] ?? "语义修正 AI 提供商"}
                                     </span>
                                     <Select
                                         size="small"
-                                        sx={{ minWidth: 240, fontSize: "0.82rem" }}
+                                        sx={{ minWidth: { xs: 150, sm: 220 }, maxWidth: "100%", fontSize: "0.82rem" }}
                                         value={state.config.ai_semantic_correction_provider || "auto"}
                                         onChange={(e) => setConfig("ai_semantic_correction_provider", e.target.value)}
                                     >

@@ -135,14 +135,14 @@ function App() {
                     {/* Frameless Edge Resize Handles */}
                     {!isMaximized && (
                         <>
-                            <div onMouseDown={(e) => { e.stopPropagation(); resizeWindow(12); }} className="fixed top-0 left-2.5 right-2.5 h-[4px] z-50 cursor-ns-resize" />
-                            <div onMouseDown={(e) => { e.stopPropagation(); resizeWindow(15); }} className="fixed bottom-0 left-2.5 right-2.5 h-[4px] z-50 cursor-ns-resize" />
-                            <div onMouseDown={(e) => { e.stopPropagation(); resizeWindow(10); }} className="fixed top-2.5 bottom-2.5 left-0 w-[4px] z-50 cursor-ew-resize" />
-                            <div onMouseDown={(e) => { e.stopPropagation(); resizeWindow(11); }} className="fixed top-2.5 bottom-2.5 right-0 w-[4px] z-50 cursor-ew-resize" />
-                            <div onMouseDown={(e) => { e.stopPropagation(); resizeWindow(13); }} className="fixed top-0 left-0 w-2.5 h-2.5 z-50 cursor-nwse-resize" />
-                            <div onMouseDown={(e) => { e.stopPropagation(); resizeWindow(14); }} className="fixed top-0 right-0 w-2.5 h-2.5 z-50 cursor-nesw-resize" />
-                            <div onMouseDown={(e) => { e.stopPropagation(); resizeWindow(16); }} className="fixed bottom-0 left-0 w-2.5 h-2.5 z-50 cursor-nesw-resize" />
-                            <div onMouseDown={(e) => { e.stopPropagation(); resizeWindow(17); }} className="fixed bottom-0 right-0 w-2.5 h-2.5 z-50 cursor-nwse-resize" />
+                            <div onMouseDown={(e) => { e.stopPropagation(); resizeWindow(12); }} className="fixed top-0 left-3 right-3 h-[5px] z-50 cursor-ns-resize" />
+                            <div onMouseDown={(e) => { e.stopPropagation(); resizeWindow(15); }} className="fixed bottom-0 left-3 right-3 h-[5px] z-50 cursor-ns-resize" />
+                            <div onMouseDown={(e) => { e.stopPropagation(); resizeWindow(10); }} className="fixed top-3 bottom-3 left-0 w-[5px] z-50 cursor-ew-resize" />
+                            <div onMouseDown={(e) => { e.stopPropagation(); resizeWindow(11); }} className="fixed top-3 bottom-3 right-0 w-[5px] z-50 cursor-ew-resize" />
+                            <div onMouseDown={(e) => { e.stopPropagation(); resizeWindow(13); }} className="fixed top-0 left-0 w-3 h-3 z-50 cursor-nwse-resize" />
+                            <div onMouseDown={(e) => { e.stopPropagation(); resizeWindow(14); }} className="fixed top-0 right-0 w-3 h-3 z-50 cursor-nesw-resize" />
+                            <div onMouseDown={(e) => { e.stopPropagation(); resizeWindow(16); }} className="fixed bottom-0 left-0 w-3 h-3 z-50 cursor-nesw-resize" />
+                            <div onMouseDown={(e) => { e.stopPropagation(); resizeWindow(17); }} className="fixed bottom-0 right-0 w-3 h-3 z-50 cursor-nwse-resize" />
                         </>
                     )}
 
@@ -348,16 +348,16 @@ function App() {
                                 if ((e.target as HTMLElement).closest('button, a, input, select, [role="button"]')) return;
                                 maximizeWindow();
                             }}
-                            className="liquid-glass-regular px-4 py-2 rounded-2xl flex items-center justify-between z-10 shrink-0 cursor-default select-none gap-2 w-full"
+                            className="liquid-glass-regular px-3.5 md:px-4 py-2 rounded-2xl flex md:grid md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center justify-between z-10 shrink-0 cursor-default select-none gap-2 w-full"
                         >
                             {/* Left: Brand Identity + Live Status & OSC Pill */}
-                            <div className="flex-1 flex items-center justify-start gap-2.5 min-w-0 overflow-hidden">
+                            <div className="flex items-center justify-start gap-2 min-w-0">
                                 <div className="flex items-baseline gap-1.5 shrink-0">
                                     <span className="text-[15px] tracking-tight font-semibold apple-text-primary">Kikitan</span>
                                     <button
                                         onClick={() => setChangelogsVisible(true)}
                                         onMouseDown={(e) => e.stopPropagation()}
-                                        className="text-[11px] font-mono apple-text-tertiary hover:apple-text-primary transition-colors cursor-pointer"
+                                        className="hidden sm:inline text-[11px] font-mono apple-text-tertiary hover:apple-text-primary transition-colors cursor-pointer"
                                     >
                                         v{appVersion}
                                     </button>
@@ -366,32 +366,39 @@ function App() {
                                 <div className="h-3.5 w-[1px] bg-[var(--border-glass)] shrink-0" />
 
                                 {/* Integrated Live Status Capsule */}
-                                <div className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium shrink min-w-0 ${
-                                    appState.is_muted
-                                        ? "badge-pastel-yellow"
-                                        : isRunning
-                                            ? "badge-pastel-green"
-                                            : "liquid-glass-clear apple-text-secondary"
-                                }`}>
-                                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                                <Tooltip title={appState.is_muted
+                                    ? (localization.status_muted_warning?.[appState.config.language] ?? "VRChat 静音")
+                                    : isRunning
+                                        ? (localization.listening_active?.[appState.config.language] ?? "监听翻译中")
+                                        : (localization.listening_idle?.[appState.config.language] ?? "待机")}
+                                >
+                                    <div className={`flex items-center gap-1.5 px-2 py-1 md:px-2.5 md:py-0.5 rounded-full text-[11px] font-medium shrink-0 ${
                                         appState.is_muted
-                                            ? "bg-amber-400 animate-pulse"
+                                            ? "badge-pastel-yellow"
                                             : isRunning
-                                                ? "bg-emerald-400 animate-pulse"
-                                                : "bg-zinc-400"
-                                    }`} />
-                                    <span className="truncate">
-                                        {appState.is_muted
-                                            ? (localization.status_muted_warning?.[appState.config.language] ?? "VRChat 静音")
-                                            : isRunning
-                                                ? (localization.listening_active?.[appState.config.language] ?? "监听翻译中")
-                                                : (localization.listening_idle?.[appState.config.language] ?? "待机")}
-                                    </span>
-                                </div>
+                                                ? "badge-pastel-green"
+                                                : "liquid-glass-clear apple-text-secondary"
+                                    }`}>
+                                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                                            appState.is_muted
+                                                ? "bg-amber-400 animate-pulse"
+                                                : isRunning
+                                                    ? "bg-emerald-400 animate-pulse"
+                                                    : "bg-zinc-400"
+                                        }`} />
+                                        <span className="hidden md:inline whitespace-nowrap">
+                                            {appState.is_muted
+                                                ? (localization.status_muted_warning?.[appState.config.language] ?? "VRChat 静音")
+                                                : isRunning
+                                                    ? (localization.listening_active?.[appState.config.language] ?? "监听翻译中")
+                                                    : (localization.listening_idle?.[appState.config.language] ?? "待机")}
+                                        </span>
+                                    </div>
+                                </Tooltip>
 
                                 {/* Compact OSC Port Indicator */}
                                 <div
-                                    className="hidden lg:flex items-center gap-1 text-[11px] font-mono apple-text-secondary px-2.5 py-0.5 rounded-full liquid-glass-clear shrink-0"
+                                    className="hidden xl:flex items-center gap-1 text-[11px] font-mono apple-text-secondary px-2.5 py-0.5 rounded-full liquid-glass-clear shrink-0 whitespace-nowrap"
                                     title={`OSC: ${appState.config.osc_address || "127.0.0.1"}:${appState.config.osc_port || 9000}`}
                                 >
                                     <span>OSC</span>
@@ -404,11 +411,11 @@ function App() {
 
                             {/* Center: Apple Segmented Mode Control */}
                             <div className="shrink-0 flex items-center justify-center">
-                                <div className="liquid-glass-well flex items-center p-0.5 rounded-full gap-0.5">
+                                <div className="liquid-glass-well flex items-center p-0.5 rounded-full gap-0.5 whitespace-nowrap">
                                     <button
                                         onClick={() => setConfig("speech_to_text_only", false)}
                                         onMouseDown={(e) => e.stopPropagation()}
-                                        className={`flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-medium transition-all cursor-pointer ${
+                                        className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
                                             !appState.config.speech_to_text_only
                                                 ? "bg-[var(--pill-active-bg)] text-[var(--pill-active-fg)] font-semibold shadow-sm"
                                                 : "apple-text-secondary hover:apple-text-primary"
@@ -420,7 +427,7 @@ function App() {
                                     <button
                                         onClick={() => setConfig("speech_to_text_only", true)}
                                         onMouseDown={(e) => e.stopPropagation()}
-                                        className={`flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-medium transition-all cursor-pointer ${
+                                        className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
                                             appState.config.speech_to_text_only
                                                 ? "bg-[var(--pill-active-bg)] text-[var(--pill-active-fg)] font-semibold shadow-sm"
                                                 : "apple-text-secondary hover:apple-text-primary"
@@ -434,7 +441,7 @@ function App() {
 
                             {/* Right: Appearance Popover, Guide, Settings & Window Controls (三大金刚键) */}
                             <div 
-                                className="flex-1 flex items-center justify-end gap-1.5 shrink-0 z-20"
+                                className="flex items-center justify-end gap-1.5 shrink-0 z-20"
                                 onMouseDown={(e) => e.stopPropagation()}
                                 onDoubleClick={(e) => e.stopPropagation()}
                             >
@@ -445,14 +452,14 @@ function App() {
                                             setGlassPopoverOpen(!glassPopoverOpen);
                                         }}
                                         onMouseDown={(e) => e.stopPropagation()}
-                                        className={`h-8 px-2.5 rounded-full flex items-center gap-1 text-xs font-medium transition-all cursor-pointer ${
+                                        className={`h-8 px-2 md:px-2.5 rounded-full flex items-center gap-1 text-xs font-medium transition-all cursor-pointer shrink-0 ${
                                             glassPopoverOpen
                                                 ? "bg-[var(--accent-blue)] text-white"
                                                 : "liquid-glass-clear apple-text-secondary hover:apple-text-primary"
                                         }`}
                                     >
                                         <TuneIcon sx={{ fontSize: 15 }} />
-                                        <span className="font-mono text-[11px] hidden sm:inline">{localGlassOpacity}%</span>
+                                        <span className="font-mono text-[11px] hidden md:inline">{localGlassOpacity}%</span>
                                     </button>
                                 </Tooltip>
 

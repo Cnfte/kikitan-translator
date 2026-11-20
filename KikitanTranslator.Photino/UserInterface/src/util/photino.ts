@@ -243,3 +243,15 @@ export function getWindowState() {
 export function registerWindowStateCallback(callback: (state: string) => void) {
     windowStateCallback = callback;
 }
+
+export function sendUiDebugLog(data: string) {
+    try {
+        // @ts-ignore
+        window.external?.sendMessage?.(JSON.stringify({
+            method: "ui_debug_log",
+            data
+        }));
+    } catch {
+        // Ignore telemetry send errors outside Photino host
+    }
+}

@@ -39,6 +39,7 @@ import {
     dragWindow,
     resizeWindow,
     sendAppState,
+    sendUiDebugLog,
     setConfig,
     update
 } from "./util/photino.ts";
@@ -117,6 +118,124 @@ function App() {
             applyGlassCssVariables(op, !!appState.config.light_mode);
         }
     }, [appState.config?.glass_opacity, appState.config?.light_mode, applyGlassCssVariables]);
+
+    React.useEffect(() => {
+        let lastSent = 0;
+        let trailingTimer: number | null = null;
+
+        const rBox = (el: Element | null | undefined) => {
+            if (!el) return null;
+            const r = el.getBoundingClientRect();
+            return {
+                x: Math.round(r.left),
+                y: Math.round(r.top),
+                w: Math.round(r.width),
+                h: Math.round(r.height),
+                sw: (el as HTMLElement).scrollWidth ?? 0,
+                cw: (el as HTMLElement).clientWidth ?? 0,
+            };
+        };
+
+        const emitSnapshot = (reason: string) => {
+            const docEl = document.documentElement;
+            const header = document.querySelector("header");
+            const main = document.querySelector("main");
+            const stageGrid = main?.querySelector("div > div.grid") ?? null;
+            const sections = stageGrid ? Array.from(stageGrid.querySelectorAll(":scope > section")) : [];
+            const dock = main?.querySelector("div > div:last-child") ?? null;
+
+            const overflows: Array<{ tag: string; cls: string; l: number; r: number; sw: number; cw: number }> = [];
+            document.querySelectorAll("header, main, section, button, input, .MuiSelect-select").forEach((el) => {
+                const r = el.getBoundingClientRect();
+                const he = el as HTMLElement;
+                if (r.width > 0 && (r.right > window.innerWidth + 1 || r.left < -1 || (he.scrollWidth > he.clientWidth + 3 && getComputedStyle(he).overflowX !== "hidden"))) {
+                    if (overflows.length < 6) {
+                        overflows.push({
+                            tag: el.tagName,
+                            cls: (typeof he.className === "string" ? he.className : "").slice(0, 48),
+                            l: Math.round(r.left),
+                            r: Math.round(r.right),
+                            sw: he.scrollWidth,
+                            cw: he.clientWidth,
+                        });
+                    }
+                }
+            });
+
+            const hBtns = header ? Array.from(header.querySelectorAll("button")) : [];
+            const winBtns = hBtns.slice(-3).map((b) => rBox(b));
+
+            const payload = {
+                reason,
+                vw: window.innerWidth,
+                vh: window.innerHeight,
+                ow: window.outerWidth,
+                oh: window.outerHeight,
+                dpr: Number(window.devicePixelRatio.toFixed(2)),
+                docW: `${docEl.clientWidth}/${docEl.scrollWidth}`,
+                hdr: rBox(header),
+                hdrParts: header ? Array.from(header.children).map((c) => rBox(c)) : [],
+                winBtns,
+                gridCols: stageGrid ? getComputedStyle(stageGrid).gridTemplateColumns : null,
+                grid: rBox(stageGrid),
+                cards: sections.map((s) => rBox(s)),
+                dock: rBox(dock),
+                overflows,
+            };
+            sendUiDebugLog(JSON.stringify(payload));
+        };
+
+        const scheduleSnapshot = (reason: string) => {
+            const now = Date.now();
+            if (now - lastSent >= 140) {
+                lastSent = now;
+                emitSnapshot(reason);
+            }
+            if (trailingTimer != null) window.clearTimeout(trailingTimer);
+            trailingTimer = window.setTimeout(() => {
+                lastSent = Date.now();
+                emitSnapshot(`${reason}:settled`);
+            }, 220);
+        };
+
+        const onResize = () => scheduleSnapshot("window_resize");
+        const onError = (e: ErrorEvent) => sendUiDebugLog(JSON.stringify({ reason: "window_error", msg: e.message, file: e.filename, line: e.lineno }));
+        const onRejection = (e: PromiseRejectionEvent) => sendUiDebugLog(JSON.stringify({ reason: "unhandled_rejection", msg: String(e.reason) }));
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "l") {
+                openURL("LOGFILES");
+            }
+        };
+
+        window.addEventListener("resize", onResize);
+        window.addEventListener("error", onError);
+        window.addEventListener("unhandledrejection", onRejection);
+        window.addEventListener("keydown", onKeyDown);
+
+        const ro = new ResizeObserver(() => scheduleSnapshot("ro_doc"));
+        ro.observe(document.documentElement);
+
+        const initTimer = window.setTimeout(() => emitSnapshot("mounted"), 300);
+
+        return () => {
+            window.clearTimeout(initTimer);
+            if (trailingTimer != null) window.clearTimeout(trailingTimer);
+            window.removeEventListener("resize", onResize);
+            window.removeEventListener("error", onError);
+            window.removeEventListener("unhandledrejection", onRejection);
+            window.removeEventListener("keydown", onKeyDown);
+            ro.disconnect();
+        };
+    }, []);
+
+    React.useEffect(() => {
+        if (loaded && appState.config != undefined) {
+            const t = window.setTimeout(() => {
+                window.dispatchEvent(new Event("resize"));
+            }, 60);
+            return () => window.clearTimeout(t);
+        }
+    }, [loaded, appState.config?.quickstart_viewed, appState.config?.light_mode, appState.config?.speech_to_text_only]);
 
     const handleOpacityChange = (val: number) => {
         const clamped = Math.max(0, Math.min(100, val));

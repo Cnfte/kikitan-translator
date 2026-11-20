@@ -34,22 +34,29 @@ public class MessageHandler
     [DllImport("user32.dll")]
     private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
-    [DllImport("user32.dll")]
+    [DllImport("user32.dll", SetLastError = true)]
     private static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
 
     private static void PostNonClientMouseDown(IntPtr hWnd, int hitTest)
     {
         try
         {
-            ReleaseCapture();
+            bool released = ReleaseCapture();
             IntPtr cursorParam = IntPtr.Zero;
+            int px = 0, py = 0;
             if (GetCursorPos(out var pt))
             {
+                px = pt.X;
+                py = pt.Y;
                 cursorParam = (IntPtr)(((pt.Y & 0xFFFF) << 16) | (pt.X & 0xFFFF));
             }
-            PostMessage(hWnd, 0x00A1 /* WM_NCLBUTTONDOWN */, (IntPtr)hitTest, cursorParam);
+            bool posted = PostMessage(hWnd, 0x00A1 /* WM_NCLBUTTONDOWN */, (IntPtr)hitTest, cursorParam);
+            UiDebugLog.Write("ACTION", $"PostNonClientMouseDown hitTest={hitTest} pt=({px},{py}) released={released} posted={posted}");
         }
-        catch { }
+        catch (Exception ex)
+        {
+            UiDebugLog.Write("ACTION", $"PostNonClientMouseDown hitTest={hitTest} ex={ex.Message}");
+        }
     }
 
     public void RegisterHandler(string methodName, IHandler handler) => _handlers.Add(methodName, handler);
@@ -63,6 +70,12 @@ public class MessageHandler
             {
                 Log.Error($"[MSGH] Unable to deserialize message");
                 
+                return null;
+            }
+
+            if (m.Method == "ui_debug_log")
+            {
+                UiDebugLog.Write("WEB-UI", m.Data);
                 return null;
             }
 
@@ -95,6 +108,7 @@ public class MessageHandler
                     {
                         try
                         {
+                            UiDebugLog.Write("ACTION", "window_minimize");
                             ShowWindow(conn.WindowHandle.WindowHandle, 6 /* SW_MINIMIZE */);
                         }
                         catch { }
@@ -118,6 +132,7 @@ public class MessageHandler
                             bool isZoomed = IsZoomed(hWnd);
                             ShowWindow(hWnd, isZoomed ? 9 /* SW_RESTORE */ : 3 /* SW_MAXIMIZE */);
                             bool actualZoomed = IsZoomed(hWnd);
+                            UiDebugLog.LogWindowGeometry(hWnd, $"ACTION:window_maximize was={isZoomed} now={actualZoomed}");
                             conn.Send(JsonConvert.SerializeObject(new Message
                             {
                                 Method = "window_state",
@@ -140,6 +155,7 @@ public class MessageHandler
             }
             if (m.Method == "window_close")
             {
+                UiDebugLog.Write("ACTION", "window_close");
                 conn.WindowClosing = true;
                 conn.WebViewReady = false;
                 var win = conn.WindowHandle;
@@ -162,6 +178,7 @@ public class MessageHandler
                 {
                     try
                     {
+                        UiDebugLog.LogWindowGeometry(conn.WindowHandle.WindowHandle, "FrontendConnected:get_window_state");
                         bool isZoomed = IsZoomed(conn.WindowHandle.WindowHandle);
                         conn.Send(JsonConvert.SerializeObject(new Message
                         {

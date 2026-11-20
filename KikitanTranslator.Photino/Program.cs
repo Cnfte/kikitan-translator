@@ -21,6 +21,7 @@ public class Program
     private static Rectangle oldWorkArea;
     private static bool windowInitialized;
     private static bool lastZoomedState;
+    private static string? lastMinMaxSummary;
     private static SubclassProc? _windowSubclassProc;
 
     [STAThread]
@@ -39,6 +40,7 @@ public class Program
         Console.OutputEncoding = System.Text.Encoding.UTF8;
         Logger.Initialize();
         AppConfig.Load();
+        if (!noUI) UiDebugLog.Initialize();
 
         VelopackApp.Build().Run();
         
@@ -124,10 +126,18 @@ public class Program
             
             window.Center();
             windowInitialized = true;
+            if (OperatingSystem.IsWindows())
+            {
+                UiDebugLog.LogWindowGeometry(window.WindowHandle, "WindowCreated");
+            }
         };
 
         window.WindowClosing += (_, _) =>
         {
+            if (OperatingSystem.IsWindows())
+            {
+                UiDebugLog.LogWindowGeometry(window.WindowHandle, "WindowClosing");
+            }
             connector.WindowClosing = true;
             connector.WebViewReady = false;
             connector.WindowHandle = null;
@@ -139,6 +149,7 @@ public class Program
             if (windowInitialized && !connector.WindowClosing)
             {
                 lastZoomedState = true;
+                if (OperatingSystem.IsWindows()) UiDebugLog.LogWindowGeometry(window.WindowHandle, "Event:WindowMaximized");
                 connector.Send(Newtonsoft.Json.JsonConvert.SerializeObject(new Message { Method = "window_state", Data = "maximized" }));
             }
         };
@@ -148,6 +159,7 @@ public class Program
             if (windowInitialized && !connector.WindowClosing)
             {
                 lastZoomedState = false;
+                if (OperatingSystem.IsWindows()) UiDebugLog.LogWindowGeometry(window.WindowHandle, "Event:WindowRestored");
                 connector.Send(Newtonsoft.Json.JsonConvert.SerializeObject(new Message { Method = "window_state", Data = "restored" }));
             }
         };
@@ -213,6 +225,7 @@ public class Program
 
         oldRatio = ratio;
         oldWorkArea = workArea;
+        UiDebugLog.Write("WIN32", $"UpdateResolution ratio={ratio:F2} workArea=({workArea.Left},{workArea.Top},{workArea.Width}x{workArea.Height}) MinSize={window.MinSize} MaxSize={window.MaxSize} Init={windowInitialized}");
     }
 
     /// <summary>Screen area of the window's monitor without the taskbar, in window pixels.</summary>
@@ -328,10 +341,31 @@ public class Program
     [DllImport("user32.dll")]
     private static extern int GetSystemMetricsForDpi(int nIndex, uint dpi);
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativePoint
+    {
+        public int X;
+        public int Y;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MinMaxInfo
+    {
+        public NativePoint Reserved;
+        public NativePoint MaxSize;
+        public NativePoint MaxPosition;
+        public NativePoint MinTrackSize;
+        public NativePoint MaxTrackSize;
+    }
+
     private static IntPtr BorderlessFrameSubclassProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, UIntPtr uIdSubclass, UIntPtr dwRefData)
     {
+        const uint WM_SIZE = 0x0005;
+        const uint WM_GETMINMAXINFO = 0x0024;
         const uint WM_NCDESTROY = 0x0082;
         const uint WM_NCCALCSIZE = 0x0083;
+        const uint WM_ENTERSIZEMOVE = 0x0231;
+        const uint WM_EXITSIZEMOVE = 0x0232;
         const int SM_CXSIZEFRAME = 32;
         const int SM_CYSIZEFRAME = 33;
         const int SM_CXPADDEDBORDER = 92;
@@ -362,6 +396,38 @@ public class Program
             }
             // Return 0 so client area spans edge-to-edge cleanly without non-client caption or 8px Acrylic gap
             return IntPtr.Zero;
+        }
+
+        if (uMsg == WM_GETMINMAXINFO && lParam != IntPtr.Zero)
+        {
+            IntPtr res = DefSubclassProc(hWnd, uMsg, wParam, lParam);
+            try
+            {
+                var mmi = Marshal.PtrToStructure<MinMaxInfo>(lParam);
+                string summary = $"MinTrack=({mmi.MinTrackSize.X}x{mmi.MinTrackSize.Y}) MaxTrack=({mmi.MaxTrackSize.X}x{mmi.MaxTrackSize.Y}) MaxSize=({mmi.MaxSize.X}x{mmi.MaxSize.Y}) MaxPos=({mmi.MaxPosition.X},{mmi.MaxPosition.Y})";
+                if (summary != lastMinMaxSummary)
+                {
+                    lastMinMaxSummary = summary;
+                    UiDebugLog.Write("WIN32", $"WM_GETMINMAXINFO {summary}");
+                }
+            }
+            catch { }
+            return res;
+        }
+
+        if (uMsg == WM_ENTERSIZEMOVE)
+        {
+            UiDebugLog.LogWindowGeometry(hWnd, "WM_ENTERSIZEMOVE");
+        }
+        else if (uMsg == WM_EXITSIZEMOVE)
+        {
+            UiDebugLog.LogWindowGeometry(hWnd, "WM_EXITSIZEMOVE");
+        }
+        else if (uMsg == WM_SIZE)
+        {
+            int w = (int)(lParam.ToInt64() & 0xFFFF);
+            int h = (int)((lParam.ToInt64() >> 16) & 0xFFFF);
+            UiDebugLog.LogWindowGeometry(hWnd, $"WM_SIZE(type={(int)wParam}, {w}x{h})", throttle: (int)wParam == 0);
         }
 
         return DefSubclassProc(hWnd, uMsg, wParam, lParam);

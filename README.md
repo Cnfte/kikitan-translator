@@ -8,7 +8,7 @@
 <img src="https://i.imgur.com/l7NBjqk.png" alt="Buy Me a Coffee" width="150" height="45" align="center">
 </a>
 <br><br>
-<img width=500 src="[[https://i.imgur.com/C9fSR9O.png](https://img.cdn1.vip/i/6b0053cf26641_1795183567.webp](https://raw.githubusercontent.com/Cnfte/kikitan-translator/refs/heads/main/%7BC331A962-49C6-4779-8EB2-8B53CC763344%7D.png))" />
+<img width=500 src="https://raw.githubusercontent.com/Cnfte/kikitan-translator/refs/heads/main/%7BC331A962-49C6-4779-8EB2-8B53CC763344%7D.png" />
 </div>
 
 > **著作权与上游声明 / Copyright & Attribution**

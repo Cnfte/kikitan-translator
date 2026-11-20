@@ -1,26 +1,28 @@
 import * as React from 'react';
 
-import Kikitan from "./pages/Kikitan"
+import Kikitan from "./pages/Kikitan";
 
 import {
-    AppBar,
-    Toolbar,
-    Typography,
-    Select,
-    MenuItem,
     Button,
-    IconButton,
     CircularProgress,
+    Tooltip,
 } from '@mui/material';
 
 import {
-    Settings,
-    Translate,
-    WbSunny,
-    NightsStay,
+    Settings as SettingsIcon,
+    HelpOutline as HelpOutlineIcon,
     Favorite,
     DownloadOutlined,
     Clear,
+    GraphicEq as GraphicEqIcon,
+    Translate as TranslateIcon,
+    Remove as MinimizeIcon,
+    CropSquare as MaximizeIcon,
+    FilterNone as RestoreIcon,
+    Close as CloseIcon,
+    Tune as TuneIcon,
+    DarkMode as DarkModeIcon,
+    LightMode as LightModeIcon,
 } from '@mui/icons-material';
 
 import Changelogs from './pages/Changelogs';
@@ -29,6 +31,13 @@ import {
     controlKikitan,
     openURL,
     registerStateCallback,
+    registerWindowStateCallback,
+    getWindowState,
+    minimizeWindow,
+    maximizeWindow,
+    closeWindow,
+    dragWindow,
+    resizeWindow,
     sendAppState,
     setConfig,
     update
@@ -40,255 +49,507 @@ import {app_state} from "./util/constants.ts";
 let updateViewed = false;
 
 function App() {
-    const [changelogsVisible, setChangelogsVisible] = React.useState(false)
-    const [settingsVisible, setSettingsVisible] = React.useState(false)
-    const [donateVisible, setDonateVisible] = React.useState(false)
-    const [updaterVisible, setUpdaterVisible] = React.useState(false)
-    const [updating, setUpdating] = React.useState(false)
-    const [showProgress, setShowProgress] = React.useState(false)
-    const [updaterText, setUpdaterText] = React.useState("")
-    const [newVersion, setNewVersion] = React.useState("")
-    const [appVersion, setAppVersion] = React.useState("")
+    const [changelogsVisible, setChangelogsVisible] = React.useState(false);
+    const [settingsVisible, setSettingsVisible] = React.useState(false);
+    const [donateVisible, setDonateVisible] = React.useState(false);
+    const [updaterVisible, setUpdaterVisible] = React.useState(false);
+    const [updating, setUpdating] = React.useState(false);
+    const [showProgress, setShowProgress] = React.useState(false);
+    const [updaterText, setUpdaterText] = React.useState("");
+    const [newVersion, setNewVersion] = React.useState("");
+    const [appVersion, setAppVersion] = React.useState("");
+    const [isMaximized, setIsMaximized] = React.useState(false);
+    const [glassPopoverOpen, setGlassPopoverOpen] = React.useState(false);
+    const [localGlassOpacity, setLocalGlassOpacity] = React.useState<number>(55);
 
-    const [stateUpdated, setStateUpdated] = React.useState<boolean>(false)
     // @ts-ignore
     const [appState, setAppState] = React.useState<app_state>({});
+    const [loaded, setLoaded] = React.useState(false);
 
-    const [loaded, setLoaded] = React.useState(false)
-    
+    const applyGlassCssVariables = React.useCallback((opacityValue: number, isLight: boolean) => {
+        const clamped = Math.max(0, Math.min(100, opacityValue));
+        const op = clamped / 100;
+        const root = document.documentElement;
+        root.setAttribute("data-theme", isLight ? "light" : "dark");
+        root.style.setProperty("--glass-canvas-alpha", (0.03 + op * 0.82).toFixed(3));
+        root.style.setProperty("--glass-surface-alpha", (0.14 + op * 0.78).toFixed(3));
+        root.style.setProperty("--glass-elevated-alpha", (0.24 + op * 0.72).toFixed(3));
+        root.style.setProperty("--glass-well-alpha", (0.08 + op * 0.45).toFixed(3));
+        root.style.setProperty("--glass-blur", `${Math.round(12 + op * 28)}px`);
+    }, []);
 
     React.useEffect(() => {
-        setTimeout(() => setLoaded(true), 300);
+        setTimeout(() => setLoaded(true), 120);
 
-        sendAppState()
+        sendAppState();
         registerStateCallback(state => {
             if (!updateViewed) {
-                setUpdaterText(localization.new_update_available[state.config.language])
-                setUpdaterVisible(state.server_version != null)
-                
-                setAppVersion(state.app_version)
-                setNewVersion(state.server_version)
+                setUpdaterText(localization.new_update_available[state.config.language]);
+                setUpdaterVisible(state.server_version != null);
+                setAppVersion(state.app_version);
+                setNewVersion(state.server_version);
             }
-            
-            setChangelogsVisible(state.config.last_version != state.app_version)
 
-            setAppState(state)
-            setStateUpdated(!stateUpdated)
-        })
+            setChangelogsVisible(state.config.last_version != state.app_version);
+            setAppState(state);
+        });
+
+        registerWindowStateCallback((state) => {
+            setIsMaximized(state === "maximized");
+        });
+        getWindowState();
 
         if (localStorage.getItem("last_donation") == null) {
-            localStorage.setItem("last_donation", "1")
+            localStorage.setItem("last_donation", "1");
         } else {
-            const last = parseInt(localStorage.getItem("last_donation")!)
-
-            if ((last + 60 * 60 * 12 * 1000) <= Date.now()) {
-                setDonateVisible(true)
-                localStorage.setItem("last_donation", `${Date.now()}`)
+            const last = parseInt(localStorage.getItem("last_donation")!);
+            if ((last + 60 * 60 * 24 * 1000) <= Date.now()) {
+                setDonateVisible(true);
+                localStorage.setItem("last_donation", `${Date.now()}`);
             }
         }
-    }, [])
+    }, []);
+
+    React.useEffect(() => {
+        if (appState.config != undefined) {
+            const op = appState.config.glass_opacity ?? 55;
+            setLocalGlassOpacity(op);
+            applyGlassCssVariables(op, !!appState.config.light_mode);
+        }
+    }, [appState.config?.glass_opacity, appState.config?.light_mode, applyGlassCssVariables]);
+
+    const handleOpacityChange = (val: number) => {
+        const clamped = Math.max(0, Math.min(100, val));
+        setLocalGlassOpacity(clamped);
+        applyGlassCssVariables(clamped, !!appState.config?.light_mode);
+        setConfig("glass_opacity", clamped);
+    };
+
+    const isRunning = appState.status === 2;
 
     return (
         <>
-            {appState.config != undefined && <div
-                className={`relative transition-all duration-500 ${!loaded ? "opacity-0 pointer-events-none" : "opacity-100"} ${!appState.config.light_mode ? "bg-slate-950 text-white" : ""} select-none`}>
-                <div
-                    className={`transition-all z-20 w-full h-screen flex backdrop-blur-sm bg-transparent justify-center items-center absolute` + (!appState.config.quickstart_viewed && appState.config.language != null ? " opacity-100" : " opacity-0 pointer-events-none")}>
-                    <QuickstartMenu state={appState}></QuickstartMenu>
-                </div>
+            {appState.config != undefined && (
+                <div className={`relative h-screen overflow-hidden liquid-glass-canvas font-sans select-none transition-opacity duration-300 ${!loaded ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
+                    
+                    {/* Frameless Edge Resize Handles */}
+                    {!isMaximized && (
+                        <>
+                            <div onMouseDown={(e) => { e.stopPropagation(); resizeWindow(12); }} className="fixed top-0 left-2.5 right-2.5 h-[4px] z-50 cursor-ns-resize" />
+                            <div onMouseDown={(e) => { e.stopPropagation(); resizeWindow(15); }} className="fixed bottom-0 left-2.5 right-2.5 h-[4px] z-50 cursor-ns-resize" />
+                            <div onMouseDown={(e) => { e.stopPropagation(); resizeWindow(10); }} className="fixed top-2.5 bottom-2.5 left-0 w-[4px] z-50 cursor-ew-resize" />
+                            <div onMouseDown={(e) => { e.stopPropagation(); resizeWindow(11); }} className="fixed top-2.5 bottom-2.5 right-0 w-[4px] z-50 cursor-ew-resize" />
+                            <div onMouseDown={(e) => { e.stopPropagation(); resizeWindow(13); }} className="fixed top-0 left-0 w-2.5 h-2.5 z-50 cursor-nwse-resize" />
+                            <div onMouseDown={(e) => { e.stopPropagation(); resizeWindow(14); }} className="fixed top-0 right-0 w-2.5 h-2.5 z-50 cursor-nesw-resize" />
+                            <div onMouseDown={(e) => { e.stopPropagation(); resizeWindow(16); }} className="fixed bottom-0 left-0 w-2.5 h-2.5 z-50 cursor-nesw-resize" />
+                            <div onMouseDown={(e) => { e.stopPropagation(); resizeWindow(17); }} className="fixed bottom-0 right-0 w-2.5 h-2.5 z-50 cursor-nwse-resize" />
+                        </>
+                    )}
 
-                <div
-                    className={'transition-all z-30 w-full h-screen flex backdrop-blur-sm bg-transparent justify-center items-center absolute' + (donateVisible && appState.config.quickstart_viewed ? " opacity-100" : " opacity-0 pointer-events-none")}>
+                    {/* Quickstart Modal */}
                     <div
-                        className={`flex flex-col justify-center w-6/12 h-3/6 outline outline-1 ${appState.config.light_mode ? "outline-white" : "outline-slate-950"} rounded ${appState.config.light_mode ? "bg-white" : "bg-slate-950"}`}>
-                        <div className='flex flex-row justify-center'>
-                            <p className='ml-4 text-md text-center'>{localization.donation_text[appState.config.language]}</p>
-                        </div>
-                        <div className='flex justify-center mt-4 gap-2 ml-4 mr-4'>
-                            <Button variant="contained" color="secondary" className='w-48' onClick={() => {
-                                openURL("https://buymeacoffee.com/sergiomarquina")
-                            }}><Favorite className='mr-2'/><p className='text-xs'>Buy Me a Coffee</p></Button>
-                            <Button sx={{
-                                backgroundColor: "#fc4d50"
-                            }} variant="contained" className='w-48' onClick={() => {
-                                openURL("https://booth.pm/en/items/6073050")
-                            }}>
-                                <img src="/boothlogo.svg" width={24} className="mr-2"></img>
-                                <p className="mt-0.5"><p className='text-xs'>Booth.pm</p></p>
-                            </Button>
-                            <Button variant="contained" className='w-48' onClick={() => {
-                                setDonateVisible(false)
-                            }}><p className='text-xs'>{localization.close[appState.config.language]}</p></Button>
-                        </div>
+                        className={`transition-all z-40 w-full h-screen flex backdrop-blur-md bg-black/45 justify-center items-center absolute inset-0` + (!appState.config.quickstart_viewed && appState.config.language != null ? " opacity-100" : " opacity-0 pointer-events-none")}>
+                        <QuickstartMenu state={appState}></QuickstartMenu>
                     </div>
-                </div>
 
-                <div
-                    className={'transition-all z-30 w-full h-screen flex backdrop-blur-sm bg-transparent justify-center items-center absolute' + (updaterVisible && appState.config.quickstart_viewed ? " opacity-100" : " opacity-0 pointer-events-none")}>
+                    {/* Donation Modal */}
                     <div
-                        className={`flex flex-row items-center w-96 ${appState.is_linux && !appState.is_appimage ? "h-80" : "h-48"} outline outline-1 ${appState.config.light_mode ? "outline-white" : "outline-slate-950"} rounded ${appState.config.light_mode ? "bg-white" : "bg-slate-950"} px-4 gap-4`}>
-                        
-                        {(!appState.is_linux || appState.is_appimage) && 
-                        <>
-                            <div className={`flex flex-col flex-1 transition-opacity duration-240 ${(updating && !showProgress) ? "opacity-0" : "opacity-100"}`}>
-                                <p className={`${showProgress ? "text-4xl" : "text-3xl"} text-center`}>{updaterText}</p>
-                                {!showProgress && <p className="text-md italic text-slate-600 text-center">{newVersion}</p>}
+                        className={'transition-all z-50 w-full h-screen flex backdrop-blur-md bg-black/45 justify-center items-center absolute inset-0' + (donateVisible && appState.config.quickstart_viewed ? " opacity-100" : " opacity-0 pointer-events-none")}>
+                        <div className="flex flex-col justify-between w-[500px] max-w-[92vw] p-7 liquid-glass-sheet rounded-3xl">
+                            <div className='flex flex-row justify-center'>
+                                <p className='text-sm text-center leading-relaxed apple-text-primary'>{localization.donation_text[appState.config.language]}</p>
                             </div>
-                            <div className="relative flex flex-col gap-2" style={{ width: 128, height: 104 }}>
-                                <div className={`transition-opacity duration-300 ${updating ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
-                                    <Button
-                                        variant="contained"
-                                        disabled={updating}
-                                        color="success"
-                                        className='w-32 h-12'
-                                        onClick={() => {
-                                            setUpdating(true)
-                                            setTimeout(() => {
-                                                setShowProgress(true)
-                                                setUpdaterText(localization.updating[appState.config.language])
-                                                update()
-                                            }, 300)
-                                        }}>
-                                        <p className='text-md'>
-                                            <DownloadOutlined fontSize="small" />
-                                            {localization.update[appState.config.language]}
-                                        </p>
-                                    </Button>
-                                </div>
-                                <div className={`transition-opacity duration-300 ${updating ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
-                                    <Button
-                                        variant="contained"
-                                        disabled={updating}
-                                        className='w-32 h-12'
-                                        onClick={() => {
-                                            updateViewed = true;
-                                            setUpdaterVisible(false)
-                                        }}>
-                                        <Clear fontSize="small" />
-                                        <p className='text-xs'>{localization.close[appState.config.language]}</p>
-                                    </Button>
-                                </div>
-
-                                {showProgress &&
-                                    <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 z-20`}>
-                                        <CircularProgress size={96} />
-                                    </div>
-                                }
-                            </div>
-                        </>   
-                        }
-                        
-                        {(appState.is_linux && !appState.is_appimage) && 
-                        <>
-                            <div className="flex flex-col flex-1 gap-2 text-center items-center">
-                                <p className="text-4xl text-center">{updaterText}</p>
-                                <p className='text-md'>{localization.not_appimage_warning[appState.config.language]}</p>
+                            <div className='flex justify-center mt-6 gap-3 flex-wrap'>
+                                <Button
+                                    variant="outlined"
+                                    className='!px-4 !py-2 !rounded-xl !border-[var(--border-glass-strong)] !text-[var(--text-primary)]'
+                                    onClick={() => openURL("https://buymeacoffee.com/sergiomarquina")}
+                                >
+                                    <Favorite className='mr-1.5' fontSize="small"/>
+                                    <span className='text-xs font-semibold'>Buy Me a Coffee</span>
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    className='!px-4 !py-2 !rounded-xl !border-[var(--border-glass-strong)] !text-[var(--text-primary)]'
+                                    onClick={() => openURL("https://booth.pm/en/items/6073050")}
+                                >
+                                    <span className='text-xs font-semibold'>Booth.pm</span>
+                                </Button>
                                 <Button
                                     variant="contained"
-                                    disabled={updating}
-                                    className='w-32 h-12'
-                                    onClick={() => {
-                                        updateViewed = true;
-                                        setUpdaterVisible(false)
-                                    }}>
-                                    <Clear fontSize="small" />
-                                    <p className='text-xs'>{localization.close[appState.config.language]}</p>
+                                    className='!px-6 !py-2 !bg-[var(--accent-blue)] !text-white !font-semibold !rounded-xl'
+                                    onClick={() => setDonateVisible(false)}
+                                >
+                                    <span className='text-xs'>{localization.close[appState.config.language]}</span>
                                 </Button>
                             </div>
-                            
-                        </>
-                        }
+                        </div>
                     </div>
-                </div>
 
-                <div
-                    className={'transition-all z-30 w-full h-screen flex backdrop-blur-sm bg-transparent justify-center items-center absolute' + (settingsVisible ? " opacity-100" : " opacity-0 pointer-events-none")}>
+                    {/* Updater Modal */}
                     <div
-                        className={`flex flex-col justify-between  w-10/12 h-5/6 outline outline-1 ${appState.config.light_mode ? "outline-slate-400" : "outline-slate-950"} rounded bg-white`}>
-                        <SettingsPage state={appState} closeCallback={() => {
-                            setSettingsVisible(false)
-                            controlKikitan(true)
-                        }}/>
+                        className={'transition-all z-50 w-full h-screen flex backdrop-blur-md bg-black/45 justify-center items-center absolute inset-0' + (updaterVisible && appState.config.quickstart_viewed ? " opacity-100" : " opacity-0 pointer-events-none")}>
+                        <div className="flex flex-col items-center w-[440px] p-7 liquid-glass-sheet rounded-3xl gap-4">
+                            {(!appState.is_linux || appState.is_appimage) && (
+                                <>
+                                    <div className="flex flex-col items-center text-center">
+                                        <p className="text-lg font-semibold tracking-tight apple-text-primary">{updaterText}</p>
+                                        {!showProgress && <p className="text-xs font-mono apple-text-secondary mt-1">{newVersion}</p>}
+                                    </div>
+                                    <div className="flex gap-3 mt-2">
+                                        <Button
+                                            variant="contained"
+                                            disabled={updating}
+                                            className='!h-9 !px-5 !bg-[var(--accent-blue)] !text-white !font-semibold !rounded-xl'
+                                            onClick={() => {
+                                                setUpdating(true);
+                                                setTimeout(() => {
+                                                    setShowProgress(true);
+                                                    setUpdaterText(localization.updating[appState.config.language]);
+                                                    update();
+                                                }, 300);
+                                            }}>
+                                            <DownloadOutlined fontSize="small" className="mr-1.5" />
+                                            <span className="text-xs">{localization.update[appState.config.language]}</span>
+                                        </Button>
+                                        <Button
+                                            variant="outlined"
+                                            disabled={updating}
+                                            className='!h-9 !px-5 !border-[var(--border-glass-strong)] !text-[var(--text-primary)] !rounded-xl'
+                                            onClick={() => {
+                                                updateViewed = true;
+                                                setUpdaterVisible(false);
+                                            }}>
+                                            <Clear fontSize="small" className="mr-1" />
+                                            <span className="text-xs">{localization.close[appState.config.language]}</span>
+                                        </Button>
+                                    </div>
+                                    {showProgress && (
+                                        <div className="flex items-center justify-center my-2">
+                                            <CircularProgress size={32} sx={{ color: "var(--accent-blue)" }} />
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                        </div>
                     </div>
-                </div>
-                {appState.config.quickstart_viewed && changelogsVisible &&
+
+                    {/* Settings Sheet Modal */}
                     <div
-                        className={'transition-all z-30 w-full h-screen flex backdrop-blur-sm bg-transparent justify-center items-center absolute' + (changelogsVisible ? " opacity-100" : " opacity-0 pointer-events-none")}>
-                        <div
-                            className={`flex flex-col justify-between  w-10/12 h-5/6 outline outline-1 ${appState.config.light_mode ? "outline-slate-400" : "outline-slate-950"} rounded bg-white`}>
-                            <Changelogs state={appState} closeCallback={() => {
-                                setConfig("last_version", appState.app_version)
-                                setChangelogsVisible(false)
+                        className={'transition-all z-40 w-full h-screen flex backdrop-blur-md bg-black/40 justify-center items-center absolute inset-0' + (settingsVisible ? " opacity-100 pointer-events-auto" : " opacity-0 pointer-events-none")}>
+                        <div className="flex flex-col w-[92vw] max-w-[940px] h-[84vh] rounded-3xl liquid-glass-sheet overflow-hidden">
+                            <SettingsPage state={appState} closeCallback={() => {
+                                setSettingsVisible(false);
+                                controlKikitan(true);
                             }}/>
                         </div>
                     </div>
-                }
 
-                <div className="flex flex-col h-screen z-0">
-                    <AppBar position="static">
-                        <Toolbar>
-                            <Typography className="flex" variant="h6" component="div" sx={{flexGrow: 1}}>
-                                Kikitan Translator
-                                <p className="text-sm italic ml-2 mt-2">
-                                    <a href='' onClick={(e) => {
-                                        e.preventDefault()
-
-                                        setChangelogsVisible(true)
-                                    }}>v{appVersion}</a>
-                                </p>
-                            </Typography>
-                            <div className='flex'>
-                                <Select sx={{
-                                    color: 'white',
-                                    '& .MuiSvgIcon-root': {
-                                        color: 'white'
-                                    }
-                                }} variant='outlined' className="ml-4 mr-2"
-                                        value={appState.config.speech_to_text_only ? 1 : 0}
-                                        onChange={(e) => setConfig("speech_to_text_only", e.target.value == 1)}>
-                                    <MenuItem value={0}>{localization.translation[appState.config.language]}</MenuItem>
-                                    <MenuItem value={1}>{localization.stt_only[appState.config.language]}</MenuItem>
-                                </Select>
-                                <IconButton sx={{
-                                    color: 'white',
-                                    '& .MuiSvgIcon-root': {
-                                        color: 'white'
-                                    }
-                                }} onClick={() => setConfig("light_mode", !appState.config.light_mode)}>
-                                    {appState.config.light_mode ? <NightsStay/> : <WbSunny/>}
-                                </IconButton>
-                                <IconButton sx={{
-                                    color: 'white',
-                                    '& .MuiSvgIcon-root': {
-                                        color: 'white'
-                                    }
-                                }} onClick={() => {
-                                    controlKikitan(false)
-                                    setConfig("quickstart_viewed", false)
-                                }}>
-                                    <Translate/>
-                                </IconButton>
-                                <IconButton sx={{
-                                    color: 'white',
-                                    '& .MuiSvgIcon-root': {
-                                        color: 'white'
-                                    }
-                                }} onClick={() => {
-                                    controlKikitan(false)
-                                    setSettingsVisible(true)
-                                }}>
-                                    <Settings/>
-                                </IconButton>
+                    {/* Changelogs Modal */}
+                    {appState.config.quickstart_viewed && changelogsVisible && (
+                        <div
+                            className={'transition-all z-40 w-full h-screen flex backdrop-blur-md bg-black/40 justify-center items-center absolute inset-0' + (changelogsVisible ? " opacity-100 pointer-events-auto" : " opacity-0 pointer-events-none")}>
+                            <div className="flex flex-col w-[92vw] max-w-[860px] h-[82vh] rounded-3xl liquid-glass-sheet overflow-hidden">
+                                <Changelogs state={appState} closeCallback={() => {
+                                    setConfig("last_version", appState.app_version);
+                                    setChangelogsVisible(false);
+                                }}/>
                             </div>
-                        </Toolbar>
-                    </AppBar>
-                    <div className='flex flex-1 items-center align-middle flex-col mt-8'>
-                        {loaded && appState.config.quickstart_viewed && <Kikitan state={appState}/>}
+                        </div>
+                    )}
+
+                    {/* Quick Frosted Glass & Theme Popover */}
+                    {glassPopoverOpen && (
+                        <>
+                            <div
+                                className="fixed inset-0 z-30"
+                                onClick={() => setGlassPopoverOpen(false)}
+                            />
+                            <div className="fixed top-16 right-4 z-40 w-80 p-4 rounded-2xl liquid-glass-sheet flex flex-col gap-3.5">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-semibold tracking-tight apple-text-primary">
+                                        {localization.appearance_and_glass?.[appState.config.language] ?? "外观与磨砂材质"}
+                                    </span>
+                                    <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-full liquid-glass-clear">
+                                        {localGlassOpacity}%
+                                    </span>
+                                </div>
+
+                                {/* Theme Segmented Switcher */}
+                                <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl liquid-glass-well">
+                                    <button
+                                        onClick={() => setConfig("light_mode", false)}
+                                        className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                                            !appState.config.light_mode
+                                                ? "bg-[var(--pill-active-bg)] text-[var(--pill-active-fg)] font-semibold shadow-sm"
+                                                : "apple-text-secondary hover:apple-text-primary"
+                                        }`}
+                                    >
+                                        <DarkModeIcon sx={{ fontSize: 14 }} />
+                                        <span>{localization.theme_dark_glass?.[appState.config.language] ?? "深邃暗色"}</span>
+                                    </button>
+                                    <button
+                                        onClick={() => setConfig("light_mode", true)}
+                                        className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                                            appState.config.light_mode
+                                                ? "bg-[var(--pill-active-bg)] text-[var(--pill-active-fg)] font-semibold shadow-sm"
+                                                : "apple-text-secondary hover:apple-text-primary"
+                                        }`}
+                                    >
+                                        <LightModeIcon sx={{ fontSize: 14 }} />
+                                        <span>{localization.theme_light_glass?.[appState.config.language] ?? "冰晶浅色"}</span>
+                                    </button>
+                                </div>
+
+                                {/* 0 - 100 Continuous Opacity Slider */}
+                                <div className="flex flex-col gap-1.5">
+                                    <div className="flex items-center justify-between text-[11px] apple-text-secondary">
+                                        <span>{localization.glass_opacity_label?.[appState.config.language] ?? "磨砂透度 (0 - 100)"}</span>
+                                        <span className="font-mono">0 - 100</span>
+                                    </div>
+                                    <input
+                                        type="range"
+                                        min={0}
+                                        max={100}
+                                        value={localGlassOpacity}
+                                        onChange={(e) => handleOpacityChange(parseInt(e.target.value, 10))}
+                                        className="apple-slider"
+                                    />
+                                    <div className="flex items-center justify-between gap-1 pt-1">
+                                        {[0, 25, 55, 80, 100].map((preset) => (
+                                            <button
+                                                key={preset}
+                                                onClick={() => handleOpacityChange(preset)}
+                                                className={`flex-1 py-1 rounded-lg text-[10px] font-mono transition-all ${
+                                                    localGlassOpacity === preset
+                                                        ? "bg-[var(--accent-blue)] text-white font-semibold"
+                                                        : "liquid-glass-clear apple-text-secondary hover:apple-text-primary"
+                                                }`}
+                                            >
+                                                {preset}%
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    {/* Main Application Layout */}
+                    <div className="flex flex-col h-screen overflow-hidden px-4 pt-3 pb-3.5 gap-3">
+                        
+                        {/* Apple HIG Unified Top Navigation Bar */}
+                        <header
+                            onMouseDown={(e) => {
+                                if ((e.target as HTMLElement).closest('button, a, input, select, [role="button"]')) return;
+                                dragWindow();
+                            }}
+                            onDoubleClick={(e) => {
+                                if ((e.target as HTMLElement).closest('button, a, input, select, [role="button"]')) return;
+                                maximizeWindow();
+                            }}
+                            className="liquid-glass-regular px-4 py-2 rounded-2xl flex items-center justify-between z-10 shrink-0 cursor-default select-none gap-2 w-full"
+                        >
+                            {/* Left: Brand Identity + Live Status & OSC Pill */}
+                            <div className="flex-1 flex items-center justify-start gap-2.5 min-w-0 overflow-hidden">
+                                <div className="flex items-baseline gap-1.5 shrink-0">
+                                    <span className="text-[15px] tracking-tight font-semibold apple-text-primary">Kikitan</span>
+                                    <button
+                                        onClick={() => setChangelogsVisible(true)}
+                                        onMouseDown={(e) => e.stopPropagation()}
+                                        className="text-[11px] font-mono apple-text-tertiary hover:apple-text-primary transition-colors cursor-pointer"
+                                    >
+                                        v{appVersion}
+                                    </button>
+                                </div>
+
+                                <div className="h-3.5 w-[1px] bg-[var(--border-glass)] shrink-0" />
+
+                                {/* Integrated Live Status Capsule */}
+                                <div className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium shrink min-w-0 ${
+                                    appState.is_muted
+                                        ? "badge-pastel-yellow"
+                                        : isRunning
+                                            ? "badge-pastel-green"
+                                            : "liquid-glass-clear apple-text-secondary"
+                                }`}>
+                                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                                        appState.is_muted
+                                            ? "bg-amber-400 animate-pulse"
+                                            : isRunning
+                                                ? "bg-emerald-400 animate-pulse"
+                                                : "bg-zinc-400"
+                                    }`} />
+                                    <span className="truncate">
+                                        {appState.is_muted
+                                            ? (localization.status_muted_warning?.[appState.config.language] ?? "VRChat 静音")
+                                            : isRunning
+                                                ? (localization.listening_active?.[appState.config.language] ?? "监听翻译中")
+                                                : (localization.listening_idle?.[appState.config.language] ?? "待机")}
+                                    </span>
+                                </div>
+
+                                {/* Compact OSC Port Indicator */}
+                                <div
+                                    className="hidden lg:flex items-center gap-1 text-[11px] font-mono apple-text-secondary px-2.5 py-0.5 rounded-full liquid-glass-clear shrink-0"
+                                    title={`OSC: ${appState.config.osc_address || "127.0.0.1"}:${appState.config.osc_port || 9000}`}
+                                >
+                                    <span>OSC</span>
+                                    <span className="apple-text-primary font-semibold">
+                                        {appState.config.osc_port || 9000}
+                                        {appState.config.osc_enable_dual_dispatch && appState.config.osc_secondary_port ? `+${appState.config.osc_secondary_port}` : ""}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Center: Apple Segmented Mode Control */}
+                            <div className="shrink-0 flex items-center justify-center">
+                                <div className="liquid-glass-well flex items-center p-0.5 rounded-full gap-0.5">
+                                    <button
+                                        onClick={() => setConfig("speech_to_text_only", false)}
+                                        onMouseDown={(e) => e.stopPropagation()}
+                                        className={`flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-medium transition-all cursor-pointer ${
+                                            !appState.config.speech_to_text_only
+                                                ? "bg-[var(--pill-active-bg)] text-[var(--pill-active-fg)] font-semibold shadow-sm"
+                                                : "apple-text-secondary hover:apple-text-primary"
+                                        }`}
+                                    >
+                                        <TranslateIcon sx={{ fontSize: 13 }} />
+                                        <span>{localization.vr_mode_normal[appState.config.language] ?? "语音翻译"}</span>
+                                    </button>
+                                    <button
+                                        onClick={() => setConfig("speech_to_text_only", true)}
+                                        onMouseDown={(e) => e.stopPropagation()}
+                                        className={`flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-medium transition-all cursor-pointer ${
+                                            appState.config.speech_to_text_only
+                                                ? "bg-[var(--pill-active-bg)] text-[var(--pill-active-fg)] font-semibold shadow-sm"
+                                                : "apple-text-secondary hover:apple-text-primary"
+                                        }`}
+                                    >
+                                        <GraphicEqIcon sx={{ fontSize: 13 }} />
+                                        <span>{localization.vr_mode_stt_only[appState.config.language] ?? "仅转文字"}</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Right: Appearance Popover, Guide, Settings & Window Controls (三大金刚键) */}
+                            <div 
+                                className="flex-1 flex items-center justify-end gap-1.5 shrink-0 z-20"
+                                onMouseDown={(e) => e.stopPropagation()}
+                                onDoubleClick={(e) => e.stopPropagation()}
+                            >
+                                <Tooltip title={localization.appearance_and_glass?.[appState.config.language] ?? "外观与磨砂透度 (0-100)"}>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setGlassPopoverOpen(!glassPopoverOpen);
+                                        }}
+                                        onMouseDown={(e) => e.stopPropagation()}
+                                        className={`h-8 px-2.5 rounded-full flex items-center gap-1 text-xs font-medium transition-all cursor-pointer ${
+                                            glassPopoverOpen
+                                                ? "bg-[var(--accent-blue)] text-white"
+                                                : "liquid-glass-clear apple-text-secondary hover:apple-text-primary"
+                                        }`}
+                                    >
+                                        <TuneIcon sx={{ fontSize: 15 }} />
+                                        <span className="font-mono text-[11px] hidden sm:inline">{localGlassOpacity}%</span>
+                                    </button>
+                                </Tooltip>
+
+                                <Tooltip title="使用指南 / Guide">
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            controlKikitan(false);
+                                            setConfig("quickstart_viewed", false);
+                                        }}
+                                        onMouseDown={(e) => e.stopPropagation()}
+                                        className="w-8 h-8 rounded-full liquid-glass-clear flex items-center justify-center apple-text-secondary hover:apple-text-primary transition-all cursor-pointer"
+                                    >
+                                        <HelpOutlineIcon sx={{ fontSize: 16 }} />
+                                    </button>
+                                </Tooltip>
+                                
+                                <Tooltip title={localization.settings[appState.config.language]}>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            controlKikitan(false);
+                                            setSettingsVisible(true);
+                                        }}
+                                        onMouseDown={(e) => e.stopPropagation()}
+                                        className="w-8 h-8 rounded-full liquid-glass-clear flex items-center justify-center apple-text-secondary hover:apple-text-primary transition-all cursor-pointer"
+                                    >
+                                        <SettingsIcon sx={{ fontSize: 16 }} />
+                                    </button>
+                                </Tooltip>
+
+                                <div className="w-[1px] h-4 bg-[var(--border-glass)] mx-0.5 shrink-0" />
+
+                                {/* 三大金刚键: 最小化 / 最大化或还原 / 关闭 */}
+                                <div 
+                                    className="liquid-glass-clear flex items-center p-0.5 rounded-full gap-0.5 shrink-0"
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                    onDoubleClick={(e) => e.stopPropagation()}
+                                >
+                                    <Tooltip title="最小化 / Minimize">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                minimizeWindow();
+                                            }}
+                                            onMouseDown={(e) => e.stopPropagation()}
+                                            onDoubleClick={(e) => e.stopPropagation()}
+                                            className="w-7 h-7 rounded-full flex items-center justify-center apple-text-secondary hover:apple-text-primary hover:bg-black/10 dark:hover:bg-white/10 active:scale-90 transition-all cursor-pointer"
+                                        >
+                                            <MinimizeIcon sx={{ fontSize: 15 }} />
+                                        </button>
+                                    </Tooltip>
+                                    
+                                    <Tooltip title={isMaximized ? "向下还原 / Restore" : "最大化 / Maximize"}>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                maximizeWindow();
+                                            }}
+                                            onMouseDown={(e) => e.stopPropagation()}
+                                            onDoubleClick={(e) => e.stopPropagation()}
+                                            className="w-7 h-7 rounded-full flex items-center justify-center apple-text-secondary hover:apple-text-primary hover:bg-black/10 dark:hover:bg-white/10 active:scale-90 transition-all cursor-pointer"
+                                        >
+                                            {isMaximized ? (
+                                                <RestoreIcon sx={{ fontSize: 13 }} />
+                                            ) : (
+                                                <MaximizeIcon sx={{ fontSize: 13 }} />
+                                            )}
+                                        </button>
+                                    </Tooltip>
+                                    
+                                    <Tooltip title="关闭 / Close">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                closeWindow();
+                                            }}
+                                            onMouseDown={(e) => e.stopPropagation()}
+                                            onDoubleClick={(e) => e.stopPropagation()}
+                                            className="w-7 h-7 rounded-full flex items-center justify-center apple-text-secondary hover:!text-white hover:bg-red-500 active:scale-90 transition-all cursor-pointer"
+                                        >
+                                            <CloseIcon sx={{ fontSize: 14 }} />
+                                        </button>
+                                    </Tooltip>
+                                </div>
+                            </div>
+                        </header>
+
+                        {/* Main Workspace */}
+                        <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                            {loaded && appState.config.quickstart_viewed && <Kikitan state={appState}/>}
+                        </main>
                     </div>
                 </div>
-            </div>}
+            )}
         </>
-    )
+    );
 }
 
-export default App
+export default App;

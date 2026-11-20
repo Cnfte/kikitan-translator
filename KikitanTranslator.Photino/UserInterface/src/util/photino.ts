@@ -1,10 +1,12 @@
-﻿import {app_state} from "./constants.ts";
+import {app_state, proxy_config} from "./constants.ts";
 
 const pendingRequests = new Map();
 let recognitionCallback: ((r: string, t: string, f: boolean) => void) | null = null;
 let stateCallback: ((state: app_state) => void) | null = null;
 let microphoneChangedCallback: (() => void) | null = null;
 let notificationCallback: ((msg: string, level: number) => void) | null = null;
+let windowStateCallback: ((state: string) => void) | null = null;
+const requestCallbacks = new Map<string, (data: any) => void>();
 
 export function init() {
     // @ts-ignore
@@ -19,6 +21,13 @@ export function init() {
         const response = JSON.parse(message);
         if (response.method == "mic_changed") {
             microphoneChangedCallback?.();
+
+            return;
+        } else if (response.method == "fetch_models" || response.method == "test_proxy") {
+            const requestResponse = JSON.parse(response.data);
+            const requestCallback = requestCallbacks.get(requestResponse.id);
+            requestCallbacks.delete(requestResponse.id);
+            requestCallback?.(requestResponse);
 
             return;
         } else if (response.method == "fetch") {
@@ -40,6 +49,10 @@ export function init() {
             return;
         } else if (response.method == "notification") {
             notificationCallback?.(data.msg, data.level);
+
+            return;
+        } else if (response.method == "window_state") {
+            windowStateCallback?.(response.data);
 
             return;
         }
@@ -68,6 +81,52 @@ export async function fetchURL(url: string): Promise<string> {
 
         pendingRequests.set("fetch", resolve)
     });
+}
+
+/**
+ * Asks the backend for the models the given provider offers for the configured API key.
+ */
+export function requestModels(provider: string, protocol: string | undefined, callback: (response: modelsResponse) => void) {
+    sendRequest("fetch_models", {provider, protocol}, callback as (data: any) => void);
+}
+
+/**
+ * Sends a small request through the given proxy to check whether it works.
+ */
+export function requestProxyTest(proxy: proxy_config, callback: (response: proxyTestResponse) => void) {
+    sendRequest("test_proxy", {proxy}, callback as (data: any) => void);
+}
+
+function sendRequest(method: string, payload: object, callback: (data: any) => void) {
+    const id = `${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 10)}`;
+    requestCallbacks.set(id, callback);
+
+    // @ts-ignore
+    window.external.sendMessage(JSON.stringify({
+        method,
+        data: JSON.stringify({...payload, id})
+    }));
+
+    // Don't hold on to the callback forever if the backend never answers
+    setTimeout(() => requestCallbacks.delete(id), 90000);
+}
+
+export type modelsResponse = {
+    id: string;
+    ok: boolean;
+    models?: string[];
+    status?: number;
+    error?: string;
+    message?: string;
+}
+
+export type proxyTestResponse = {
+    id: string;
+    ok: boolean;
+    status?: number;
+    latency_ms?: number;
+    error?: string;
+    message?: string;
 }
 
 export function manualTranslate(data: string) {
@@ -132,4 +191,55 @@ export function registerMicrophoneChangedCallback(callback: () => void) {
 
 export function registerNotificationCallback(callback: (msg: string, level: number) => void) {
     notificationCallback = callback;
+}
+export function dragWindow() {
+    // @ts-ignore
+    window.external.sendMessage(JSON.stringify({
+        method: "window_drag",
+        data: ""
+    }));
+}
+
+export function resizeWindow(edge: number) {
+    // @ts-ignore
+    window.external.sendMessage(JSON.stringify({
+        method: "window_resize",
+        data: `${edge}`
+    }));
+}
+
+export function minimizeWindow() {
+    // @ts-ignore
+    window.external.sendMessage(JSON.stringify({
+        method: "window_minimize",
+        data: ""
+    }));
+}
+
+export function maximizeWindow() {
+    // @ts-ignore
+    window.external.sendMessage(JSON.stringify({
+        method: "window_maximize",
+        data: ""
+    }));
+}
+
+export function closeWindow() {
+    // @ts-ignore
+    window.external.sendMessage(JSON.stringify({
+        method: "window_close",
+        data: ""
+    }));
+}
+
+export function getWindowState() {
+    // @ts-ignore
+    window.external.sendMessage(JSON.stringify({
+        method: "get_window_state",
+        data: ""
+    }));
+}
+
+export function registerWindowStateCallback(callback: (state: string) => void) {
+    windowStateCallback = callback;
 }

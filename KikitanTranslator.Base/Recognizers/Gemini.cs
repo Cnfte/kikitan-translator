@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Net.WebSockets;
 using System.Resources;
 using System.Runtime.InteropServices;
@@ -209,7 +209,7 @@ public class Gemini(ICapture capture) : IRecognizer
 
     private async Task<bool> ValidateKey()
     {
-        using (HttpClient client = new HttpClient())
+        using (HttpClient client = NetworkClientFactory.Create(TimeSpan.FromSeconds(10)))
         {
             try
             {

@@ -1,4 +1,8 @@
-bin
+﻿bin
 obj
 Releases
 build-dir
+payload.zip
+.idea/
+.vscode/
+.vs/

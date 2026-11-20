@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <ApplicationHighDpiMode>SystemAware</ApplicationHighDpiMode>
+    <AssemblyName>Installer-win64</AssemblyName>
+    <Product>Kikitan Translator Setup</Product>
+    <Company>Kikitan</Company>
+    <Version>2.2.3</Version>
+    <ApplicationIcon>..\KikitanTranslator.Photino\Resources\wwwroot\kikitan_logo.ico</ApplicationIcon>
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>false</SelfContained>
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="payload.zip" Condition="Exists('payload.zip')" />
+    <EmbeddedResource Include="..\KikitanTranslator.Photino\Resources\wwwroot\kikitan_logo.ico" LogicalName="app_icon.ico" />
+  </ItemGroup>
+</Project>

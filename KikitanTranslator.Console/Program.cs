@@ -1,4 +1,4 @@
-﻿using KikitanTranslator.Base;
+using KikitanTranslator.Base;
 using KikitanTranslator.Base.Outputs;
 using KikitanTranslator.Base.Translators;
 using KikitanTranslator.Capture;
@@ -7,7 +7,6 @@ using KikitanTranslator.Utility;
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
 Logger.Initialize();
-
 
 AppConfig.Load();
 

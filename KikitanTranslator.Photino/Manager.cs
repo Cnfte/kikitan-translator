@@ -66,6 +66,27 @@ public class Manager
 
     public DeviceInfo[] GetMicrophones() => _mic.GetCaptureDevices();
 
+    /// <summary>
+    /// An overlay process that survived an unclean shutdown keeps the memory mapped pipe open,
+    /// which would make the next start fail, so leftovers are stopped before a new one starts.
+    /// </summary>
+    private static void StopLeftoverOverlays()
+    {
+        foreach (var process in Process.GetProcessesByName("KikitanTranslator.Overlay"))
+        {
+            try
+            {
+                Log.Information($"[APP] Stopping the leftover overlay process {process.Id}");
+                process.Kill();
+                process.WaitForExit(3000);
+            }
+            catch (Exception e)
+            {
+                Log.Warning($"[APP] Could not stop the overlay process {process.Id}: {e.Message}");
+            }
+        }
+    }
+
     public Manager(bool noUI, Connector connector)
     {
         _appState.Config = AppConfig.ConfigObject;
@@ -85,15 +106,24 @@ public class Manager
         _appState.IsAppimage = _appState.IsLinux && Environment.GetEnvironmentVariable("KIKITAN_NOT_APPIMAGE") == null;
         _connector = connector;
 
-        Task.Run(async () =>
+        // The self update feed must point at your own repository: using the original project
+        // would let the updater replace this build with the upstream (unmodified) app.
+        if (string.IsNullOrWhiteSpace(Constants.UPDATE_FEED_URL))
         {
-            var mgr = new UpdateManager(new GithubSource("https://github.com/YusufOzmen01/kikitan-translator", null, true));
+            Log.Information("[APP] Self update check is disabled: no update feed is configured");
+        }
+        else
+        {
+            Task.Run(async () =>
+            {
+                var mgr = new UpdateManager(new GithubSource(Constants.UPDATE_FEED_URL, null, true));
 
-            var newVersion = await mgr.CheckForUpdatesAsync();
-            _appState.ServerVersion = newVersion?.TargetFullRelease.Version.ToString();
-            
-            SendUpdateToUI();
-        });
+                var newVersion = await mgr.CheckForUpdatesAsync();
+                _appState.ServerVersion = newVersion?.TargetFullRelease.Version.ToString();
+
+                SendUpdateToUI();
+            });
+        }
         
         AppConfig.OnUpdate += () =>
         {
@@ -104,7 +134,16 @@ public class Manager
 
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) && !noUI)
         {
-            _writer = new();
+            StopLeftoverOverlays();
+
+            try
+            {
+                _writer = new();
+            }
+            catch (Exception e)
+            {
+                Log.Error(e, "[APP] Unable to open the overlay pipe; the desktop overlay will not work");
+            }
             
             if (!Path.Exists("KikitanTranslator.Overlay.exe"))
             {
@@ -120,14 +159,21 @@ public class Manager
             }
         }
 
-        var oscWatcher = new OscWatcher();
-        oscWatcher.MuteStatusChanged += muted =>
+        try
         {
-            _appState.IsMuted = muted;
-            
-            SendUpdateToUI();
-        };
-        oscWatcher.Start();;
+            var oscWatcher = new OscWatcher();
+            oscWatcher.MuteStatusChanged += muted =>
+            {
+                _appState.IsMuted = muted;
+                
+                SendUpdateToUI();
+            };
+            oscWatcher.Start();
+        }
+        catch (Exception ex)
+        {
+            Log.Warning($"[APP] OscWatcher failed to start: {ex.Message}");
+        }
         
         Task.Run(async () =>
         {
@@ -189,32 +235,15 @@ public class Manager
         else if (AppConfig.ConfigObject.Recognizer == 1) rMic = new GroqRecognizer(_mic);
         else rMic = new Gemini(_mic);
 
-        if (AppConfig.ConfigObject.Translator == 0) _translator = new GoogleTranslate();
-        else if (AppConfig.ConfigObject.Translator == 1)
+        var translator = CreateTranslator();
+        if (translator == null)
         {
-            if (string.IsNullOrEmpty(AppConfig.ConfigObject.GroqApiKey))
-            {
-                Log.Error("[GROQ] No API key is configured!");
-                _errorHandler.OnError("GROQ_NO_API_KEY");
+            Log.Error($"[APP] Unable to start: the configured translator ({AppConfig.ConfigObject.Translator}) is not usable");
 
-                return;
-            }
-        
-            var client = new HttpClient();
-            client.DefaultRequestHeaders.Add("Authorization", $"Bearer {AppConfig.ConfigObject.GroqApiKey}");
-            var request = new HttpRequestMessage(HttpMethod.Post, "https://api.groq.com/openai/v1/audio/transcriptions");
-
-            if (client.Send(request).StatusCode == HttpStatusCode.Unauthorized)
-            {
-                Log.Error("[GROQ] Invalid Groq API key!");
-                _errorHandler.OnError("GROQ_INVALID_API_KEY");
-
-                return;
-            }
-            
-            _translator = new GroqTranslator();
+            return;
         }
-        else _translator = new GeminiStub();
+
+        _translator = translator;
 
         _microphoneKikitan = new Kikitan(rMic, _translator, new ErrorHandler(_connector), false);
         _microphoneKikitan.AddOutput(new Custom(SendRecognitionData, false));
@@ -287,6 +316,120 @@ public class Manager
         SendUpdateToUI();
     }
 
+    /// <summary>
+    /// Translator indices: 0 = Google Translate, 1 = Groq, 2 = Gemini (the Gemini
+    /// recognizer translates on its own), 3 = OpenAI, 4 = Claude, 5 = DeepSeek,
+    /// 6 = Kimi (Moonshot) and 7 = GLM (Zhipu).
+    /// </summary>
+    private ITranslator? CreateTranslator()
+    {
+        switch (AppConfig.ConfigObject.Translator)
+        {
+            case 0:
+                return new GoogleTranslate();
+            case 1:
+                return CreateProviderTranslator(ApiProviders.Groq);
+            case 2:
+                return new GeminiStub();
+            case 3:
+                return CreateProviderTranslator(ApiProviders.OpenAi);
+            case 4:
+                return CreateProviderTranslator(ApiProviders.Claude);
+            case 5:
+                return CreateProviderTranslator(ApiProviders.DeepSeek);
+            case 6:
+                return CreateProviderTranslator(ApiProviders.Kimi);
+            case 7:
+                return CreateProviderTranslator(ApiProviders.Glm);
+            default:
+                return CreateCustomTranslator();
+        }
+    }
+
+    /// <summary>
+    /// Translators at or above <see cref="ApiProviders.CustomIndexBase"/> are providers the user
+    /// added himself. They are stored by id, so reordering the list keeps the selection.
+    /// </summary>
+    private ITranslator? CreateCustomTranslator()
+    {
+        var index = AppConfig.ConfigObject.Translator;
+
+        var custom = ApiProviders.FindCustom(AppConfig.ConfigObject, AppConfig.ConfigObject.CustomProviderId)
+                     ?? ApiProviders.FindCustom(AppConfig.ConfigObject, (index - ApiProviders.CustomIndexBase).ToString());
+
+        if (custom == null)
+        {
+            Log.Error($"[APP] The selected custom provider ({index}) does not exist (anymore)");
+            _errorHandler.OnError("CUSTOM_PROVIDER_MISSING");
+
+            return null;
+        }
+
+        return CreateProviderTranslator(custom);
+    }
+
+    private ITranslator? CreateProviderTranslator(ApiProviderInfo provider)
+    {
+        if (string.IsNullOrWhiteSpace(provider.ApiKey(AppConfig.ConfigObject)))
+        {
+            Log.Error($"[{provider.Id.ToUpperInvariant()}] No API key is configured!");
+            _errorHandler.OnError($"{provider.Id.ToUpperInvariant()}_NO_API_KEY");
+
+            return null;
+        }
+
+        if (!ValidateApiKey(provider)) return null;
+
+        return provider.Kind switch
+        {
+            ApiProviderKind.Anthropic => new AnthropicTranslator(provider),
+            ApiProviderKind.Google => new GeminiChatTranslator(provider),
+            _ => new OpenAiChatTranslator(provider)
+        };
+    }
+
+    /// <summary>
+    /// Verifies the key against the provider's model list. A network problem does not
+    /// block the start (the key might still be fine), only an explicit "unauthorized"
+    /// answer from the provider does.
+    /// </summary>
+    private bool ValidateApiKey(ApiProviderInfo provider)
+    {
+        try
+        {
+            using var client = NetworkClientFactory.Create(TimeSpan.FromSeconds(10));
+
+            using var request = new HttpRequestMessage(HttpMethod.Get, provider.ModelsUrl(AppConfig.ConfigObject, provider.ApiKey(AppConfig.ConfigObject)));
+            provider.ApplyAuth(request, provider.ApiKey(AppConfig.ConfigObject));
+
+            using var response = client.Send(request);
+            var status = (int) response.StatusCode;
+
+            Log.Debug($"[{provider.Id.ToUpperInvariant()}] API key check: status={status}, model={provider.ResolveModel(AppConfig.ConfigObject)}");
+
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                Log.Error($"[{provider.Id.ToUpperInvariant()}] Invalid API key ({status})");
+                _errorHandler.OnError($"{provider.Id.ToUpperInvariant()}_INVALID_API_KEY");
+
+                return false;
+            }
+
+            if (response.StatusCode == HttpStatusCode.Forbidden)
+            {
+                Log.Warning($"[{provider.Id.ToUpperInvariant()}] The provider refused the model list request ({status}); continuing, but check the API key permissions");
+            }
+
+            return true;
+        }
+        catch (Exception e)
+        {
+            Log.Warning($"[{provider.Id.ToUpperInvariant()}] Unable to verify the API key ({e.Message}); continuing anyway");
+
+            return true;
+        }
+    }
+
     public void Stop()
     {
         Log.Information($"[APP] Stopping...");
@@ -316,7 +459,46 @@ public class Manager
         SendUpdateToUI();
     }
 
-    public void ManualTranslate(string text) => _microphoneKikitan?.ManualTranslate(text);
+    public void ManualTranslate(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return;
+
+        if (_microphoneKikitan != null && _running)
+        {
+            _microphoneKikitan.ManualTranslate(text);
+            return;
+        }
+
+        Task.Run(() =>
+        {
+            try
+            {
+                var translator = _translator ?? CreateTranslator();
+                var translated = AppConfig.ConfigObject.SpeechToTextOnly
+                    ? ""
+                    : translator?.Translate(text, AppConfig.ConfigObject.SourceLanguage, AppConfig.ConfigObject.TargetLanguage) ?? "";
+
+                SendRecognitionData(text, translated, true);
+
+                if (AppConfig.ConfigObject.SendToChatbox)
+                {
+                    var chatbox = new Chatbox();
+                    chatbox.Send(text, translated, true);
+                }
+
+                if (AppConfig.ConfigObject.SendUserData)
+                {
+                    var osc = new OSC("/microphone");
+                    osc.Send(text, translated, true);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "[APP] Manual translation error while engine stopped");
+                _errorHandler.OnError($"Manual translation failed: {ex.Message}");
+            }
+        });
+    }
 
     public void SendUpdateToUI()
     {

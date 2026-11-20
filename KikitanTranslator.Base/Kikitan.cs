@@ -1,4 +1,4 @@
-﻿using KikitanTranslator.Base.Outputs;
+using KikitanTranslator.Base.Outputs;
 using KikitanTranslator.Base.Translators;
 using KikitanTranslator.Recognizers;
 using KikitanTranslator.Utility;
@@ -76,9 +76,28 @@ public class Kikitan : IDisposable
 
         try
         {
+            var textToProcess = text;
+            if (AppConfig.ConfigObject.AiSemanticCorrection)
+            {
+                try
+                {
+                    var srcLang = _isLoopback ? AppConfig.ConfigObject.TargetLanguage : AppConfig.ConfigObject.SourceLanguage;
+                    var corrected = AiSemanticCorrector.Correct(text, srcLang, AppConfig.ConfigObject);
+                    if (!string.IsNullOrWhiteSpace(corrected) && corrected != text)
+                    {
+                        Log.Information($"[KKTN] AI Semantic Correction: \"{text}\" -> \"{corrected}\"");
+                        textToProcess = corrected;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning($"[KKTN] AI Semantic Correction skipped: {ex.Message}");
+                }
+            }
+
             var translationTimer = System.Diagnostics.Stopwatch.StartNew();
-            Log.Debug($"[KKTN] Translation started: desktop={_isLoopback}, translator={_translator.GetType().Name}, chars={text.Length}, transcriptionOnly={AppConfig.ConfigObject.SpeechToTextOnly}");
-            var translated = AppConfig.ConfigObject.SpeechToTextOnly ? "" : _isLoopback ? _translator.Translate(text, AppConfig.ConfigObject.TargetLanguage, AppConfig.ConfigObject.SourceLanguage) : _translator.Translate(text, AppConfig.ConfigObject.SourceLanguage, AppConfig.ConfigObject.TargetLanguage);
+            Log.Debug($"[KKTN] Translation started: desktop={_isLoopback}, translator={_translator.GetType().Name}, chars={textToProcess.Length}, transcriptionOnly={AppConfig.ConfigObject.SpeechToTextOnly}");
+            var translated = AppConfig.ConfigObject.SpeechToTextOnly ? "" : _isLoopback ? _translator.Translate(textToProcess, AppConfig.ConfigObject.TargetLanguage, AppConfig.ConfigObject.SourceLanguage) : _translator.Translate(textToProcess, AppConfig.ConfigObject.SourceLanguage, AppConfig.ConfigObject.TargetLanguage);
         
             Log.Debug($"[KKTN] Translation completed: desktop={_isLoopback}, elapsedMs={translationTimer.ElapsedMilliseconds}, resultChars={translated?.Length}, hasResult={translated != null}");
             if (translated == null) Log.Warning($"[KKTN] No translation result; final output skipped: desktop={_isLoopback}");
@@ -86,11 +105,11 @@ public class Kikitan : IDisposable
             {
                 lock (_queueLock)
                 {
-                    _queue.Add([text, translated]);
+                    _queue.Add([textToProcess, translated]);
                     Log.Debug($"[KKTN] Translation queued: desktop={_isLoopback}, depth={_queue.Count}");
                 }
             
-                foreach (var output in _outputs.Where(v => !v.IsDelayed())) output.Send(text, translated, true);
+                foreach (var output in _outputs.Where(v => !v.IsDelayed())) output.Send(textToProcess, translated, true);
             }
         }
         catch (Exception e)

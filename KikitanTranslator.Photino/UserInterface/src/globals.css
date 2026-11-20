@@ -2,24 +2,342 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
+:root,
+[data-theme="dark"] {
+  --glass-rgb: 12, 14, 20;
+  --glass-surface-rgb: 24, 26, 36;
+  --glass-elevated-rgb: 32, 35, 48;
+  --glass-well-rgb: 6, 8, 14;
+  --glass-clear-rgb: 255, 255, 255;
+  --glass-clear-alpha: 0.08;
+
+  --glass-canvas-alpha: 0.42;
+  --glass-surface-alpha: 0.48;
+  --glass-elevated-alpha: 0.68;
+  --glass-well-alpha: 0.28;
+  --glass-blur: 24px;
+
+  --text-primary: #f5f5f7;
+  --text-secondary: rgba(235, 235, 245, 0.68);
+  --text-tertiary: rgba(235, 235, 245, 0.42);
+  --border-glass: rgba(255, 255, 255, 0.14);
+  --border-glass-strong: rgba(255, 255, 255, 0.24);
+  --specular-inset: rgba(255, 255, 255, 0.20);
+  --shadow-ambient: rgba(0, 0, 0, 0.34);
+
+  --accent-blue: #0a84ff;
+  --accent-green: #30d158;
+  --accent-amber: #ff9f0a;
+  --accent-red: #ff453a;
+  --pill-active-bg: #ffffff;
+  --pill-active-fg: #090a0f;
 }
 
-body {
-  font-family: 'Inter';
+[data-theme="light"] {
+  --glass-rgb: 242, 244, 250;
+  --glass-surface-rgb: 255, 255, 255;
+  --glass-elevated-rgb: 255, 255, 255;
+  --glass-well-rgb: 226, 230, 240;
+  --glass-clear-rgb: 15, 23, 42;
+  --glass-clear-alpha: 0.06;
+
+  --text-primary: #1d1d1f;
+  --text-secondary: rgba(29, 29, 31, 0.66);
+  --text-tertiary: rgba(29, 29, 31, 0.44);
+  --border-glass: rgba(15, 23, 42, 0.12);
+  --border-glass-strong: rgba(15, 23, 42, 0.22);
+  --specular-inset: rgba(255, 255, 255, 0.72);
+  --shadow-ambient: rgba(15, 23, 42, 0.12);
+
+  --accent-blue: #007aff;
+  --accent-green: #28cd41;
+  --accent-amber: #ff9500;
+  --accent-red: #ff3b30;
+  --pill-active-bg: #1d1d1f;
+  --pill-active-fg: #ffffff;
 }
 
-@layer base {
-  h2 {
-    @apply text-2xl;
-  }
-  h3 {
-    @apply text-xl;
-  }
-  ul, ol {
-    list-style: revert;
-  }
+html, body {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: var(--text-primary);
+  overflow: hidden;
+  user-select: none;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Segoe UI Variable Display", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.011em;
+}
+
+#root {
+  background: transparent !important;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+/* =========================================================================
+   Apple HIG & iOS 26 Liquid Glass Dynamic Material Hierarchy
+   ========================================================================= */
+
+/* Root Canvas: Pure translucent tint over native Windows DWM Acrylic */
+.liquid-glass-canvas {
+  background: rgba(var(--glass-rgb), var(--glass-canvas-alpha)) !important;
+  color: var(--text-primary);
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+/* Primary Frosted Card & Navigation Surface */
+.liquid-glass-regular {
+  background: rgba(var(--glass-surface-rgb), var(--glass-surface-alpha)) !important;
+  backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  border: 1px solid var(--border-glass);
+  box-shadow: 0 10px 34px var(--shadow-ambient),
+              inset 0 1px 0 0 var(--specular-inset);
+  color: var(--text-primary);
+  transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+}
+
+/* Elevated Modal / Sheet / Popover Frosted Surface */
+.liquid-glass-sheet {
+  background: rgba(var(--glass-elevated-rgb), var(--glass-elevated-alpha)) !important;
+  backdrop-filter: blur(calc(var(--glass-blur) + 12px)) saturate(190%);
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur) + 12px)) saturate(190%);
+  border: 1px solid var(--border-glass-strong);
+  box-shadow: 0 24px 68px var(--shadow-ambient),
+              inset 0 1px 0 0 var(--specular-inset);
+  color: var(--text-primary);
+}
+
+/* Clear Interactive Pill / Capsule Control */
+.liquid-glass-clear {
+  background: rgba(var(--glass-clear-rgb), var(--glass-clear-alpha)) !important;
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  border: 1px solid var(--border-glass);
+  box-shadow: inset 0 1px 0 0 var(--specular-inset);
+  color: var(--text-primary);
+}
+
+/* Inset Content Well / Grouped Row Container */
+.liquid-glass-well {
+  background: rgba(var(--glass-well-rgb), var(--glass-well-alpha)) !important;
+  backdrop-filter: blur(calc(var(--glass-blur) * 0.75));
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 0.75));
+  border: 1px solid var(--border-glass);
+  color: var(--text-primary);
+}
+
+/* Theme-Aware Text Utilities */
+.apple-text-primary {
+  color: var(--text-primary) !important;
+}
+
+.apple-text-secondary {
+  color: var(--text-secondary) !important;
+}
+
+.apple-text-tertiary {
+  color: var(--text-tertiary) !important;
+}
+
+.apple-divider {
+  border-color: var(--border-glass) !important;
+}
+
+/* =========================================================================
+   Apple HIG Native-Style Controls (Slider & Switch)
+   ========================================================================= */
+
+.apple-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 9999px;
+  background: rgba(var(--glass-clear-rgb), 0.18);
+  border: 1px solid var(--border-glass);
+  outline: none;
+  cursor: pointer;
+}
+
+.apple-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.32);
+  cursor: pointer;
+  transition: transform 120ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 120ms ease;
+}
+
+.apple-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.08);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.42);
+}
+
+.apple-slider::-webkit-slider-thumb:active {
+  transform: scale(0.96);
+}
+
+.apple-switch {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  border-radius: 9999px;
+  background: rgba(var(--glass-clear-rgb), 0.18);
+  border: 1px solid var(--border-glass);
+  cursor: pointer;
+  transition: background-color 180ms ease, border-color 180ms ease;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+}
+
+.apple-switch[data-checked="true"] {
+  background: var(--accent-green);
+  border-color: transparent;
+}
+
+.apple-switch-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  transform: translateX(0);
+  transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.apple-switch[data-checked="true"] .apple-switch-thumb {
+  transform: translateX(20px);
+}
+
+/* Semantic Status Pills */
+.badge-pastel-green {
+  background-color: rgba(48, 209, 88, 0.16);
+  color: var(--accent-green);
+  border: 1px solid rgba(48, 209, 88, 0.34);
+}
+
+.badge-pastel-blue {
+  background-color: rgba(10, 132, 255, 0.16);
+  color: var(--accent-blue);
+  border: 1px solid rgba(10, 132, 255, 0.34);
+}
+
+.badge-pastel-red {
+  background-color: rgba(255, 69, 58, 0.16);
+  color: var(--accent-red);
+  border: 1px solid rgba(255, 69, 58, 0.34);
+}
+
+.badge-pastel-yellow {
+  background-color: rgba(255, 159, 10, 0.16);
+  color: var(--accent-amber);
+  border: 1px solid rgba(255, 159, 10, 0.34);
+}
+
+/* Tactile Press Response */
+button, [role="button"] {
+  transition: transform 140ms cubic-bezier(0.16, 1, 0.3, 1), background-color 150ms ease, border-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
+}
+
+button:active:not(:disabled), [role="button"]:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Scrollbar Refinement */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-glass-strong) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--border-glass-strong);
+  border-radius: 9999px;
+}
+
+/* Material UI Overrides for Dynamic Dark & Light Frosted Themes */
+.MuiPaper-root {
+  background-color: rgba(var(--glass-elevated-rgb), 0.90) !important;
+  backdrop-filter: blur(36px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(36px) saturate(190%) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-glass-strong) !important;
+  box-shadow: 0 18px 48px var(--shadow-ambient), inset 0 1px 0 var(--specular-inset) !important;
+  border-radius: 14px !important;
+}
+
+.MuiMenuItem-root {
+  color: var(--text-primary) !important;
+  font-size: 0.84rem !important;
+  font-family: inherit !important;
+  padding: 7px 12px !important;
+  border-radius: 8px !important;
+  margin: 2px 5px !important;
+  transition: background-color 120ms ease !important;
+}
+
+.MuiMenuItem-root:hover {
+  background-color: rgba(var(--glass-clear-rgb), 0.10) !important;
+}
+
+.MuiMenuItem-root.Mui-selected {
+  background-color: var(--accent-blue) !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+}
+
+.MuiOutlinedInput-root {
+  color: var(--text-primary) !important;
+  background-color: rgba(var(--glass-well-rgb), var(--glass-well-alpha)) !important;
+  font-family: inherit !important;
+  border-radius: 10px !important;
+}
+
+.MuiOutlinedInput-notchedOutline {
+  border-color: var(--border-glass) !important;
+}
+
+.MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
+  border-color: var(--border-glass-strong) !important;
+}
+
+.MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+  border-color: var(--accent-blue) !important;
+  border-width: 1.5px !important;
+}
+
+.MuiSelect-icon {
+  color: var(--text-secondary) !important;
+}
+
+.MuiButton-root {
+  text-transform: none !important;
+  font-family: inherit !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+}
+
+.MuiChip-root {
+  background-color: rgba(var(--glass-clear-rgb), 0.08) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-glass) !important;
+  border-radius: 8px !important;
+  font-family: inherit !important;
 }

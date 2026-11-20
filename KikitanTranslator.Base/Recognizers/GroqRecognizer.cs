@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using KikitanTranslator.Capture;
@@ -16,7 +16,7 @@ public class GroqRecognizer : IRecognizer
     public event OnRecognizerStatus? OnRecognizerStatusChanged;
 
     private readonly ICapture _capture;
-    private readonly HttpClient _httpClient = new();
+    private readonly HttpClient _httpClient = NetworkClientFactory.Create(TimeSpan.FromMinutes(2));
 
     private RecognizerStatus _status = RecognizerStatus.NotStarted;
 
@@ -45,7 +45,7 @@ public class GroqRecognizer : IRecognizer
             return;
         }
         
-        var client = new HttpClient();
+        using var client = NetworkClientFactory.Create(TimeSpan.FromSeconds(10));
         client.DefaultRequestHeaders.Add("Authorization", $"Bearer {AppConfig.ConfigObject.GroqApiKey}");
         var request = new HttpRequestMessage(HttpMethod.Post, "https://api.groq.com/openai/v1/audio/transcriptions");
 

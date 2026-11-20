@@ -38,7 +38,9 @@ public class OverlayWriter : IDisposable
     
     public OverlayWriter()
     {
-        _mmf = MemoryMappedFile.CreateNew("kikitan-pipe", 4096);
+        // CreateOrOpen: a leftover overlay (after an unclean shutdown) may still hold the pipe;
+        // CreateNew would throw an IOException and take the whole app down with it.
+        _mmf = MemoryMappedFile.CreateOrOpen("kikitan-pipe", 4096);
         _accessor = _mmf.CreateViewAccessor();
     }
 

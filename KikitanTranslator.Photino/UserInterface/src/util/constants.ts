@@ -10,6 +10,9 @@ export type config = {
     disable_when_muted: boolean;
     chatbox_wait_per_char_ms: number;
     osc_port: number;
+    osc_address?: string;
+    osc_secondary_port?: number;
+    osc_enable_dual_dispatch?: boolean;
     send_to_chatbox: boolean;
     send_user_data: boolean;
     recognizer: number;
@@ -18,8 +21,53 @@ export type config = {
     quickstart_viewed: boolean;
     groq_api_key: string;
     gemini_api_key: string;
+    groq_model: string;
+    groq_base_url: string;
+    openai_api_key: string;
+    openai_model: string;
+    openai_base_url: string;
+    claude_api_key: string;
+    claude_model: string;
+    claude_base_url: string;
+    deepseek_api_key: string;
+    deepseek_model: string;
+    deepseek_base_url: string;
+    kimi_api_key: string;
+    kimi_model: string;
+    kimi_base_url: string;
+    glm_api_key: string;
+    glm_model: string;
+    glm_base_url: string;
+    disable_thinking: boolean;
+    custom_providers: custom_provider[];
+    custom_provider_id: string;
+    proxies: proxy_config[];
+    active_proxy: string;
     last_version: string;
     send_without_waiting_for_finish: boolean;
+    ai_semantic_correction: boolean;
+    ai_semantic_correction_provider: string;
+    ai_semantic_correction_prompt: string;
+    glass_opacity?: number;
+}
+
+export type custom_provider = {
+    id: string;
+    name: string;
+    protocol: string;      // openai | claude | gemini
+    base_url: string;
+    api_key: string;
+    model: string;
+}
+
+export type proxy_config = {
+    id: string;
+    label: string;
+    type: string;
+    host: string;
+    port: number;
+    username: string;
+    password: string;
 }
 
 export type app_state = {

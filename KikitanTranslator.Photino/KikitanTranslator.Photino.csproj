@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <OutputType Condition="'$(RuntimeIdentifier)' == 'linux-x64'">Exe</OutputType>
         <OutputType Condition="'$(RuntimeIdentifier)' != 'linux-x64'">WinExe</OutputType>
@@ -9,7 +9,7 @@
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
         <ApplicationIcon>Resources/wwwroot/kikitan_logo.ico</ApplicationIcon>
-        <Version>2.0.2</Version>
+        <Version>2.2.3</Version>
         <PackageId>KikitanTranslator</PackageId>
         <Title>Kikitan Translator</Title>
     </PropertyGroup>
@@ -44,8 +44,13 @@
         <ProjectReference Include="..\KikitanTranslator.Base\KikitanTranslator.Base.csproj" />
     </ItemGroup>
 
-    <Target Name="NpmBuild" BeforeTargets="CopyDistToWwwroot" Condition="'$(Configuration)' == 'Release'">
-        <Exec Command="npm run build" WorkingDirectory="$(MSBuildProjectDirectory)/UserInterface" />
+    <Target Name="NpmBuild" BeforeTargets="BeforeBuild;BeforeCompile;CoreCompile" Condition="'$(Configuration)' == 'Release'">
+        <Exec Command="cmd /c npm run build" WorkingDirectory="$(MSBuildProjectDirectory)/UserInterface" Condition="'$(OS)' == 'Windows_NT'" />
+        <Exec Command="npm run build" WorkingDirectory="$(MSBuildProjectDirectory)/UserInterface" Condition="'$(OS)' != 'Windows_NT'" />
+        <ItemGroup>
+            <BuiltDistFiles Include="$(MSBuildProjectDirectory)/UserInterface/dist/**/*" />
+        </ItemGroup>
+        <Copy SourceFiles="@(BuiltDistFiles)" DestinationFiles="@(BuiltDistFiles->'$(MSBuildProjectDirectory)/Resources/wwwroot/%(RecursiveDir)%(Filename)%(Extension)')" />
     </Target>
 
     <Target Name="CopyDistToWwwroot" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
@@ -82,7 +87,8 @@
             AfterTargets="BuildAndCopyOverlay"
             Condition="'$(Configuration)' == 'Release' AND '$(RuntimeIdentifier)' == 'win-x64'">
         <RemoveDir Directories="$(OutDir)Release" />
-        <Exec Command="vpk pack --packId $(PackageId) --packVersion $(Version) --packDir &quot;$(MSBuildProjectDirectory)/bin/Release/net9.0/win-x64&quot; --mainExe KikitanTranslator.Photino.exe --icon &quot;$(MSBuildProjectDirectory)/Resources/wwwroot/kikitan_logo.ico&quot; --packTitle &quot;$(Title)&quot; -o &quot;$(OutDir)Release&quot; -f net9.0-x64-runtime,net9.0-x64-aspnetcore,net9.0-x64-desktop,webview2" />
+        <Exec Command="&quot;$(USERPROFILE)/.dotnet/tools/vpk.exe&quot; pack --packId $(PackageId) --packVersion $(Version) --packDir &quot;$(MSBuildProjectDirectory)/bin/Release/net9.0/win-x64&quot; --mainExe KikitanTranslator.Photino.exe --icon &quot;$(MSBuildProjectDirectory)/Resources/wwwroot/kikitan_logo.ico&quot; --packTitle &quot;$(Title)&quot; -o &quot;$(OutDir)Release&quot; -f net9.0-x64-runtime,net9.0-x64-aspnetcore,net9.0-x64-desktop,webview2" Condition="'$(OS)' == 'Windows_NT'" />
+        <Exec Command="vpk pack --packId $(PackageId) --packVersion $(Version) --packDir &quot;$(MSBuildProjectDirectory)/bin/Release/net9.0/linux-x64&quot; --mainExe KikitanTranslator.Photino --icon &quot;$(MSBuildProjectDirectory)/Resources/wwwroot/kikitan_logo.ico&quot; --packTitle &quot;$(Title)&quot; -o &quot;$(OutDir)Release&quot;" Condition="'$(OS)' != 'Windows_NT'" />
     </Target>
 
     <Target Name="VelopackPackLinux"

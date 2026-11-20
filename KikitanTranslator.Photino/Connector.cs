@@ -8,6 +8,8 @@ public delegate Task<string?> OnConnectorData(string data, Connector conn);
 public class Connector
 {
     public PhotinoWindow? WindowHandle;
+    public volatile bool WebViewReady;
+    public volatile bool WindowClosing;
     
     private WebSocketServer _websocketServer;
     private List<IWebSocketConnection> _sockets = new();
@@ -27,8 +29,25 @@ public class Connector
     
     public void Send(string data)
     {
-        if (WindowHandle != null) WindowHandle.SendWebMessage(data);
-        else SendToSockets(data);
+        var win = WindowHandle;
+        if (win != null)
+        {
+            if (WebViewReady && !WindowClosing)
+            {
+                try
+                {
+                    win.SendWebMessage(data);
+                }
+                catch
+                {
+                    // Ignore sends while window is tearing down
+                }
+            }
+        }
+        else
+        {
+            SendToSockets(data);
+        }
     }
 
     private void OnWebsocketMessage(string msg, IWebSocketConnection conn)

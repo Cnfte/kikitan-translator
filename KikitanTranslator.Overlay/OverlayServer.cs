@@ -1,4 +1,4 @@
-﻿using System.IO.MemoryMappedFiles;
+using System.IO.MemoryMappedFiles;
 using KikitanTranslator.Overlay;
 using SkiaSharp;
 
@@ -57,108 +57,182 @@ public class OverlayServer
         Console.WriteLine("Image received!");
     }
 
+    private List<string> WrapText(string text, float fontSize, float maxWidth, SKPaint paint, bool noSpaceLanguage)
+    {
+        var resultLines = new List<string>();
+        var paragraphs = text.Replace("\r\n", "\n").Split('\n');
+
+        foreach (var paragraph in paragraphs)
+        {
+            if (string.IsNullOrEmpty(paragraph))
+            {
+                resultLines.Add("");
+                continue;
+            }
+
+            IEnumerable<string> tokens;
+            if (noSpaceLanguage)
+            {
+                var tokenList = new List<string>();
+                var wordBuffer = new System.Text.StringBuilder();
+                foreach (char c in paragraph)
+                {
+                    if (c <= 127 && !char.IsWhiteSpace(c))
+                    {
+                        wordBuffer.Append(c);
+                    }
+                    else
+                    {
+                        if (wordBuffer.Length > 0)
+                        {
+                            tokenList.Add(wordBuffer.ToString());
+                            wordBuffer.Clear();
+                        }
+                        if (!char.IsWhiteSpace(c))
+                        {
+                            tokenList.Add(c.ToString());
+                        }
+                    }
+                }
+                if (wordBuffer.Length > 0) tokenList.Add(wordBuffer.ToString());
+                tokens = tokenList;
+            }
+            else
+            {
+                tokens = paragraph.Split(' ');
+            }
+
+            string currentLine = "";
+            foreach (var token in tokens)
+            {
+                string separator = (noSpaceLanguage || currentLine.Length == 0) ? "" : " ";
+                string testLine = currentLine + separator + token;
+
+                if (MeasureWidthWithFallback(testLine, fontSize, paint) <= maxWidth)
+                {
+                    currentLine = testLine;
+                }
+                else
+                {
+                    if (!string.IsNullOrEmpty(currentLine))
+                    {
+                        resultLines.Add(currentLine.Trim());
+                        currentLine = token;
+                    }
+                    else
+                    {
+                        string sub = "";
+                        foreach (char ch in token)
+                        {
+                            if (MeasureWidthWithFallback(sub + ch, fontSize, paint) <= maxWidth)
+                            {
+                                sub += ch;
+                            }
+                            else
+                            {
+                                if (!string.IsNullOrEmpty(sub)) resultLines.Add(sub);
+                                sub = ch.ToString();
+                            }
+                        }
+                        currentLine = sub;
+                    }
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(currentLine))
+            {
+                resultLines.Add(currentLine.Trim());
+            }
+        }
+
+        return resultLines;
+    }
+
     private byte[] DrawTextOnCanvas(string text, bool noSpaceLanguage, int time)
     {
         const int canvasWidth = 4000;
         const int canvasHeight = 1250;
-        const int maxLines = 8;
-        const float minTextSize = 150f;
-        const float paddingX = 100f;
-        const float paddingY = 50f;
-        float fontSize = 500f;
+        const float minFontSize = 45f;
+        const float maxFontSize = 280f;
+        const float paddingX = 140f;
+        const float paddingY = 80f;
 
         float maxTextWidth = canvasWidth - paddingX * 2;
         float maxTextHeight = canvasHeight - paddingY * 2;
 
         var imageInfo = new SKImageInfo(canvasWidth, canvasHeight, SKColorType.Rgba8888, SKAlphaType.Premul);
-
         using var surface = SKSurface.Create(imageInfo);
         var canvas = surface.Canvas;
 
-        canvas.Clear(new SKColor(0x33, 0x33, 0x33));
-        
+        canvas.Clear(new SKColor(0x18, 0x18, 0x1c, 0xeb));
+
         var paint = new SKPaint
         {
             Color = SKColors.White,
             IsAntialias = true,
             TextAlign = SKTextAlign.Center,
         };
-        
-        var typeface = SKTypeface.FromFamilyName("Arial", SKFontStyle.Normal);
-        var font = new SKFont(typeface, fontSize);
 
-        string currentText = text;
+        // Binary search for largest font size where wrapped lines fit in both width and height
+        float low = minFontSize;
+        float high = maxFontSize;
+        float bestFontSize = minFontSize;
+        List<string> bestLines = null;
 
-        while ((MeasureWidthWithFallback(currentText, font.Size, paint) > maxTextWidth || MeasureHeightWithFallback(currentText, font.Size, paint) > maxTextHeight)
-               && font.Size > minTextSize)
+        for (int iter = 0; iter < 12; iter++)
         {
-            font.Size -= 1f;
+            float mid = (low + high) / 2f;
+            var lines = WrapText(text, mid, maxTextWidth, paint, noSpaceLanguage);
+            float lineHeight = mid * 1.3f;
+            float totalHeight = lines.Count * lineHeight;
+
+            if (totalHeight <= maxTextHeight)
+            {
+                bestFontSize = mid;
+                bestLines = lines;
+                low = mid + 1f;
+            }
+            else
+            {
+                high = mid - 1f;
+            }
         }
 
-
-        if (MeasureWidthWithFallback(currentText, font.Size, paint) > maxTextWidth || MeasureHeightWithFallback(currentText, font.Size, paint) > maxTextHeight)
+        if (bestLines == null)
         {
-            IEnumerable<string> tokens = noSpaceLanguage
-                ? currentText.Select(c => c.ToString())
-                : currentText.Split(' ');
-
-            var lines = new List<string>();
-            string newLine = "";
-
-            foreach (var word in tokens)
-            {
-                string candidate = newLine + word + (noSpaceLanguage ? "" : " ");
-                if (MeasureWidthWithFallback(candidate, font.Size, paint) > maxTextWidth)
-                {
-                    lines.Add(newLine.TrimEnd());
-                    newLine = "";
-                }
-
-                newLine += word + (noSpaceLanguage ? "" : " ");
-            }
-
-            if (newLine.Trim() != "")
-                lines.Add(newLine.TrimEnd());
-
-            if (lines.Count > maxLines)
-            {
-                for (int i = maxLines; i < lines.Count; i++)
-                    lines[maxLines - 1] += " " + lines[i];
-                lines = lines.Take(maxLines).ToList();
-            }
-            
-            string longestLine = lines.OrderByDescending(l => MeasureWidthWithFallback(l, font.Size, paint)).First();
-            while (font.Size > minTextSize)
-            {
-                float blockHeight = font.Size * 1.2f * lines.Count;
-                if (MeasureWidthWithFallback(longestLine, font.Size, paint) <= maxTextWidth && blockHeight <= maxTextHeight)
-                    break;
-                font.Size -= 1f;
-            }
-
-            currentText = string.Join("\n", lines);
+            bestFontSize = minFontSize;
+            bestLines = WrapText(text, bestFontSize, maxTextWidth, paint, noSpaceLanguage);
         }
 
-        var splitLines = currentText.Split('\n');
-        font.GetFontMetrics(out var metrics);
+        // If at minFontSize it still exceeds maxTextHeight, limit lines and prepend clean ellipsis
+        float finalLineHeight = bestFontSize * 1.3f;
+        int maxAllowedLines = Math.Max(1, (int)(maxTextHeight / finalLineHeight));
 
-        float lineHeight = font.Size * 1.2f;
-        float totalBlockHeight = lineHeight * splitLines.Length;
+        if (bestLines.Count > maxAllowedLines)
+        {
+            int skip = bestLines.Count - maxAllowedLines;
+            var truncated = bestLines.Skip(skip).ToList();
+            if (truncated.Count > 0 && !truncated[0].StartsWith("..."))
+            {
+                truncated[0] = "..." + truncated[0];
+            }
+            bestLines = truncated;
+        }
 
+        float totalBlockHeight = bestLines.Count * finalLineHeight;
         float centerX = canvasWidth / 2f;
         float centerY = canvasHeight / 2f;
-        
-        float startY = centerY - totalBlockHeight / 2f + Math.Abs(metrics.Ascent);
+        float startY = centerY - totalBlockHeight / 2f + (bestFontSize * 1.05f);
 
-        for (int i = 0; i < splitLines.Length; i++)
+        for (int i = 0; i < bestLines.Count; i++)
         {
-            float y = startY + i * lineHeight;
-            DrawTextWithFallback(canvas, splitLines[i], centerX, y, paint, font.Size);
+            float y = startY + i * finalLineHeight;
+            DrawTextWithFallback(canvas, bestLines[i], centerX, y, paint, bestFontSize);
         }
 
         var image = surface.Snapshot();
         var data = image.Encode(SKEncodedImageFormat.Jpeg, 90);
-        
+
         return data.ToArray();
     }
     

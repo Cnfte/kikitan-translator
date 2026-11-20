@@ -4,11 +4,12 @@ namespace KikitanTranslator.Overlay;
 
 public partial class Form1 : Form
 {
+    private readonly Rectangle _targetBounds;
     private Image img;
     private int time;
     private Bitmap _backBuffer;
 
-    public Form1(Rectangle bounds)
+    public Form1(Rectangle workArea)
     {
         InitializeComponent();
         this.FormBorderStyle = FormBorderStyle.None;
@@ -16,7 +17,16 @@ public partial class Form1 : Form
         this.BackColor = Color.Lime;
         this.TransparencyKey = Color.Lime;
         this.ShowInTaskbar = false;
-        this.Bounds = bounds;
+        this.Text = "";
+        // Manual: otherwise WinForms cascades the window to a "default" location and the strip
+        // would not sit at the bottom edge of the working area.
+        this.StartPosition = FormStartPosition.Manual;
+
+        // Only cover the strip the text is drawn in. A window as large as the screen would hide
+        // the taskbar and would show up as a "fullscreen window" in screen capture tools.
+        int stripHeight = Math.Min(workArea.Height, Math.Max(360, workArea.Height / 2));
+        _targetBounds = new Rectangle(workArea.Left, workArea.Bottom - stripHeight, workArea.Width, stripHeight);
+        this.Bounds = _targetBounds;
         
         this.DoubleBuffered = true;
         this.SetStyle(
@@ -28,10 +38,21 @@ public partial class Form1 : Form
 
         SetWindowPos(this.Handle, HWND_TOPMOST, 0, 0, 0, 0, TOPMOST_FLAGS);
 
+        // WS_EX_TOOLWINDOW keeps the overlay out of alt-tab and out of the window lists of
+        // screenshot tools, WS_EX_NOACTIVATE makes sure it never steals the focus.
         int initialStyle = (int)GetWindowLong(this.Handle, GWL_EXSTYLE);
-        SetWindowLong(this.Handle, GWL_EXSTYLE, initialStyle | WS_EX_LAYERED | WS_EX_TRANSPARENT);
+        SetWindowLong(this.Handle, GWL_EXSTYLE,
+            initialStyle | WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE);
     }
     
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+
+        var target = _targetBounds;
+        if (target.Width > 0 && Bounds != target) Bounds = target;
+    }
+
     protected override void OnPaintBackground(PaintEventArgs e) { }
 
     protected override void OnPaint(PaintEventArgs e)
@@ -56,12 +77,12 @@ public partial class Form1 : Form
 
             if (img != null)
             {
-                int w = this.Width / 5;
-                int h = img.Height / (img.Width / (this.Width / 5));
+                int maxW = Math.Min(this.Width - 80, 1600);
+                int w = Math.Max(Math.Min(maxW, (int)(this.Width * 0.72f)), 700);
+                int h = (int)((float)img.Height * w / img.Width);
                 int x = (this.Width - w) / 2;
-                int y = this.Height - h - 50;
+                int y = this.Height - h - 35;
 
-                Console.WriteLine($"Rendering to back buffer: {w}x{h}");
                 g.DrawImage(img, x, y, w, h);
             }
         }
@@ -100,6 +121,8 @@ public partial class Form1 : Form
     private const int GWL_EXSTYLE = -20;
     private const int WS_EX_LAYERED = 0x80000;
     private const int WS_EX_TRANSPARENT = 0x20;
+    private const int WS_EX_TOOLWINDOW = 0x80;
+    private const int WS_EX_NOACTIVATE = 0x08000000;
 
     private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
     private const UInt32 SWP_NOSIZE = 0x0001;

@@ -1,26 +1,9 @@
 using System.Diagnostics;
-using System.Runtime.InteropServices;
 
 namespace KikitanTranslator.Overlay;
 
 static class Program
 {
-    [DllImport("user32.dll", SetLastError = true)]
-    static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
-    
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
-
-    [StructLayout(LayoutKind.Sequential)]
-    public struct RECT
-    {
-        public int Left;
-        public int Top;
-        public int Right;
-        public int Bottom;
-    }
-    
     [STAThread]
     static void Main()
     {
@@ -31,15 +14,20 @@ static class Program
             return;
         }
         
-        Task.Run(() =>
+        Task.Run(async () =>
         {
             while (true)
+            {
                 if (Process.GetProcessesByName("KikitanTranslator.Photino").Length == 0)
                 {
                     Console.WriteLine("Kikitan is not running!");
-                    
+
                     Environment.Exit(0);
                 }
+
+                // don't spin a cpu core while waiting
+                await Task.Delay(1000);
+            }
         });
         
         Console.OutputEncoding = System.Text.Encoding.UTF8;
@@ -48,10 +36,10 @@ static class Program
 
         if (Process.GetProcessesByName("vrserver").Length != 0) server.StartOpenVR(new OpenVROverlay());
         
-        RECT rect;
         if (Screen.PrimaryScreen != null)
         {
-            Rectangle bounds = Screen.PrimaryScreen.Bounds;
+            // Working area = screen without the taskbar, so the overlay can never cover it.
+            Rectangle bounds = Screen.PrimaryScreen.WorkingArea;
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             

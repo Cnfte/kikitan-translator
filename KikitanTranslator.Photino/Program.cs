@@ -345,12 +345,6 @@ public class Program
     [DllImport("user32.dll", EntryPoint = "SetWindowLongW")]
     private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
 
-    [DllImport("user32.dll")]
-    private static extern uint GetDpiForWindow(IntPtr hWnd);
-
-    [DllImport("user32.dll")]
-    private static extern int GetSystemMetricsForDpi(int nIndex, uint dpi);
-
     [StructLayout(LayoutKind.Sequential)]
     private struct NativePoint
     {
@@ -368,6 +362,13 @@ public class Program
         public NativePoint MaxTrackSize;
     }
 
+    private static bool TryGetMonitorInfo(IntPtr hWnd, out MonitorInfo info)
+    {
+        info = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
+        IntPtr monitor = MonitorFromWindow(hWnd, MonitorDefaultToNearest);
+        return monitor != IntPtr.Zero && GetMonitorInfo(monitor, ref info);
+    }
+
     private static IntPtr BorderlessFrameSubclassProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, UIntPtr uIdSubclass, UIntPtr dwRefData)
     {
         const uint WM_SIZE = 0x0005;
@@ -375,16 +376,25 @@ public class Program
         const uint WM_GETMINMAXINFO = 0x0024;
         const uint WM_NCDESTROY = 0x0082;
         const uint WM_NCCALCSIZE = 0x0083;
+        const uint WM_NCPAINT = 0x0085;
+        const uint WM_NCACTIVATE = 0x0086;
         const uint WM_ENTERSIZEMOVE = 0x0231;
         const uint WM_EXITSIZEMOVE = 0x0232;
-        const int SM_CXSIZEFRAME = 32;
-        const int SM_CYSIZEFRAME = 33;
-        const int SM_CXPADDEDBORDER = 92;
 
         if (uMsg == WM_ERASEBKGND)
         {
             // Suppress GDI background brush erase during horizontal/vertical drags to prevent
             // flashing behind the asynchronously resizing WebView2 D3D swapchain.
+            return (IntPtr)1;
+        }
+
+        if (uMsg == WM_NCPAINT)
+        {
+            return IntPtr.Zero;
+        }
+
+        if (uMsg == WM_NCACTIVATE)
+        {
             return (IntPtr)1;
         }
 
@@ -399,18 +409,21 @@ public class Program
 
         if (uMsg == WM_NCCALCSIZE && wParam != IntPtr.Zero)
         {
-            if (IsZoomed(hWnd))
+            if (IsZoomed(hWnd) && TryGetMonitorInfo(hWnd, out var info))
             {
                 var rect = Marshal.PtrToStructure<NativeRect>(lParam);
-                uint dpi = GetDpiForWindow(hWnd);
-                int pad = GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi);
-                int cxFrame = GetSystemMetricsForDpi(SM_CXSIZEFRAME, dpi) + pad;
-                int cyFrame = GetSystemMetricsForDpi(SM_CYSIZEFRAME, dpi) + pad;
-                rect.Left += cxFrame;
-                rect.Right -= cxFrame;
-                rect.Top += cyFrame;
-                rect.Bottom -= cyFrame;
-                Marshal.StructureToPtr(rect, lParam, false);
+                int left = Math.Max(rect.Left, info.Work.Left);
+                int top = Math.Max(rect.Top, info.Work.Top);
+                int right = Math.Min(rect.Right, info.Work.Right);
+                int bottom = Math.Min(rect.Bottom, info.Work.Bottom);
+                if (right > left && bottom > top)
+                {
+                    rect.Left = left;
+                    rect.Top = top;
+                    rect.Right = right;
+                    rect.Bottom = bottom;
+                    Marshal.StructureToPtr(rect, lParam, false);
+                }
             }
             // Return 0 so client area spans edge-to-edge cleanly without non-client caption or 8px Acrylic gap
             return IntPtr.Zero;
@@ -422,6 +435,19 @@ public class Program
             try
             {
                 var mmi = Marshal.PtrToStructure<MinMaxInfo>(lParam);
+                if (TryGetMonitorInfo(hWnd, out var info))
+                {
+                    int workW = info.Work.Right - info.Work.Left;
+                    int workH = info.Work.Bottom - info.Work.Top;
+                    if (workW > 0 && workH > 0)
+                    {
+                        mmi.MaxPosition.X = info.Work.Left - info.Monitor.Left;
+                        mmi.MaxPosition.Y = info.Work.Top - info.Monitor.Top;
+                        mmi.MaxSize.X = workW;
+                        mmi.MaxSize.Y = workH;
+                        Marshal.StructureToPtr(mmi, lParam, false);
+                    }
+                }
                 string summary = $"MinTrack=({mmi.MinTrackSize.X}x{mmi.MinTrackSize.Y}) MaxTrack=({mmi.MaxTrackSize.X}x{mmi.MaxTrackSize.Y}) MaxSize=({mmi.MaxSize.X}x{mmi.MaxSize.Y}) MaxPos=({mmi.MaxPosition.X},{mmi.MaxPosition.Y})";
                 if (summary != lastMinMaxSummary)
                 {
@@ -458,12 +484,18 @@ public class Program
             const int GWL_STYLE = -16;
             const int GWL_EXSTYLE = -20;
             const int WS_CLIPCHILDREN = 0x02000000;
+            const int WS_CAPTION = 0x00C00000;
+            const int WS_SYSMENU = 0x00080000;
             const int WS_EX_LAYERED = 0x00080000;
 
+            // Keep WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_CLIPCHILDREN for borderless
+            // resize, Snap, and Acrylic, while stripping WS_CAPTION | WS_SYSMENU so Windows 11 DWM
+            // never renders duplicate native minimize/maximize/close glyphs over our custom header.
             int style = GetWindowLong(hwnd, GWL_STYLE);
-            if ((style & WS_CLIPCHILDREN) == 0)
+            int targetStyle = (style | WS_CLIPCHILDREN) & ~(WS_CAPTION | WS_SYSMENU);
+            if (targetStyle != style)
             {
-                SetWindowLong(hwnd, GWL_STYLE, style | WS_CLIPCHILDREN);
+                SetWindowLong(hwnd, GWL_STYLE, targetStyle);
             }
 
             // Photino creates transparent windows with WS_EX_LAYERED; on Windows 11 DWM / WebView2

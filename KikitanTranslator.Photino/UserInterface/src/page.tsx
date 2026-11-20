@@ -484,7 +484,7 @@ function App() {
                                     </button>
                                 </div>
 
-                                <div className="h-3.5 w-[1px] bg-[var(--border-glass)] shrink-0" />
+                                <div className="hidden md:block h-3.5 w-[1px] bg-[var(--border-glass)] shrink-0" />
 
                                 {/* Integrated Live Status Capsule */}
                                 <Tooltip title={appState.is_muted

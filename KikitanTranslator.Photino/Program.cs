@@ -456,17 +456,29 @@ public class Program
         try
         {
             const int GWL_STYLE = -16;
+            const int GWL_EXSTYLE = -20;
             const int WS_CLIPCHILDREN = 0x02000000;
+            const int WS_EX_LAYERED = 0x00080000;
+
             int style = GetWindowLong(hwnd, GWL_STYLE);
             if ((style & WS_CLIPCHILDREN) == 0)
             {
                 SetWindowLong(hwnd, GWL_STYLE, style | WS_CLIPCHILDREN);
             }
 
+            // Photino creates transparent windows with WS_EX_LAYERED; on Windows 11 DWM / WebView2
+            // this freezes the hit-test / layered redirection boundary at the initial 900px width
+            // after stretching rightward. Acrylic + DwmExtendFrameIntoClientArea(-1) do not need it.
+            int exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
+            if ((exStyle & WS_EX_LAYERED) != 0)
+            {
+                SetWindowLong(hwnd, GWL_EXSTYLE, exStyle & ~WS_EX_LAYERED);
+            }
+
             _windowSubclassProc = BorderlessFrameSubclassProc;
             if (SetWindowSubclass(hwnd, _windowSubclassProc, (UIntPtr)1, UIntPtr.Zero))
             {
-                // Force Win32 to recalculate non-client area without native caption bar
+                // Force Win32 to recalculate non-client area and flush ExStyle change
                 SetWindowPos(hwnd, IntPtr.Zero, 0, 0, 0, 0, 0x0027 /* SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER */);
             }
         }

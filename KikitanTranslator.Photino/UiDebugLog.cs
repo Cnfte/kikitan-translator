@@ -87,9 +87,11 @@ public static class UiDebugLog
             bool zoomed = IsZoomed(hwnd);
             bool iconic = IsIconic(hwnd);
             int style = GetWindowLong(hwnd, -16);
+            int exStyle = GetWindowLong(hwnd, -20);
+            IntPtr rightHit = WindowFromPoint(new POINT { X = wr.Right - 20, Y = wr.Top + 30 });
 
             var sb = new StringBuilder();
-            sb.Append($"{reason} | DPI={dpi} Style=0x{style:X8} Zoomed={zoomed} Iconic={iconic} ");
+            sb.Append($"{reason} | DPI={dpi} Style=0x{style:X8} Ex=0x{exStyle:X8} RightHit=0x{rightHit.ToInt64():X} Zoomed={zoomed} Iconic={iconic} ");
             sb.Append($"Win=({wr.Left},{wr.Top})[{wr.Right - wr.Left}x{wr.Bottom - wr.Top}] ");
             sb.Append($"Client=[{cr.Right}x{cr.Bottom}]");
 
@@ -123,10 +125,19 @@ public static class UiDebugLog
     private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 
     [StructLayout(LayoutKind.Sequential)]
+    private struct POINT
+    {
+        public int X, Y;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
     private struct RECT
     {
         public int Left, Top, Right, Bottom;
     }
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr WindowFromPoint(POINT Point);
 
     [DllImport("user32.dll")]
     private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);

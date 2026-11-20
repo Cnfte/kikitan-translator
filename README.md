@@ -92,8 +92,8 @@ Kikitan Translator 是一款面向 VRChat 的实时语音识别、翻译与聊�
 
 ```powershell
 # 1. 克隆仓库
-git clone http://192.168.2.10:31140/project2-kikitan.git
-cd project2-kikitan
+git clone https://github.com/Cnfte/kikitan-translator.git
+cd kikitan-translator
 
 # 2. 安装前端依赖
 cd KikitanTranslator.Photino/UserInterface

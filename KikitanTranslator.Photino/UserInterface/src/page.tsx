@@ -4,7 +4,6 @@ import Kikitan from "./pages/Kikitan";
 
 import {
     Button,
-    CircularProgress,
     Tooltip,
 } from '@mui/material';
 
@@ -31,6 +30,7 @@ import {
     controlKikitan,
     openURL,
     registerStateCallback,
+    registerUpdateProgressCallback,
     registerWindowStateCallback,
     getWindowState,
     minimizeWindow,
@@ -56,16 +56,30 @@ function App() {
     const [updaterVisible, setUpdaterVisible] = React.useState(false);
     const [updating, setUpdating] = React.useState(false);
     const [showProgress, setShowProgress] = React.useState(false);
+    const [updatePercent, setUpdatePercent] = React.useState(0);
+    const [updateError, setUpdateError] = React.useState<string | null>(null);
+    const [autoCountdown, setAutoCountdown] = React.useState<number | null>(null);
     const [updaterText, setUpdaterText] = React.useState("");
     const [newVersion, setNewVersion] = React.useState("");
     const [appVersion, setAppVersion] = React.useState("");
     const [isMaximized, setIsMaximized] = React.useState(false);
     const [glassPopoverOpen, setGlassPopoverOpen] = React.useState(false);
     const [localGlassOpacity, setLocalGlassOpacity] = React.useState<number>(55);
+    const changelogDismissedRef = React.useRef(false);
 
     // @ts-ignore
     const [appState, setAppState] = React.useState<app_state>({});
     const [loaded, setLoaded] = React.useState(false);
+
+    const startAutoUpdateNow = React.useCallback((lang?: "en" | "jp" | "cn" | "kr") => {
+        setAutoCountdown(null);
+        setUpdateError(null);
+        setUpdating(true);
+        setShowProgress(true);
+        setUpdatePercent(2);
+        setUpdaterText(localization.updating[lang ?? "cn"] ?? "正在下载并自动更新...");
+        update();
+    }, []);
 
     const applyGlassCssVariables = React.useCallback((opacityValue: number, isLight: boolean) => {
         const clamped = Math.max(0, Math.min(100, opacityValue));
@@ -84,15 +98,30 @@ function App() {
 
         sendAppState();
         registerStateCallback(state => {
-            if (!updateViewed) {
+            setAppVersion(state.app_version);
+            if (!updateViewed && state.server_version != null) {
                 setUpdaterText(localization.new_update_available[state.config.language]);
-                setUpdaterVisible(state.server_version != null);
-                setAppVersion(state.app_version);
                 setNewVersion(state.server_version);
+                setUpdaterVisible(true);
+                setAutoCountdown(prev => (prev === null ? 3 : prev));
             }
 
-            setChangelogsVisible(state.config.last_version != state.app_version);
+            if (!changelogDismissedRef.current) {
+                setChangelogsVisible(state.config.last_version != state.app_version);
+            }
             setAppState(state);
+        });
+
+        registerUpdateProgressCallback((p) => {
+            if (p.error) {
+                setUpdateError(p.error);
+                setUpdating(false);
+                setShowProgress(false);
+                setAutoCountdown(null);
+                return;
+            }
+            setUpdatePercent(p.percent);
+            if (p.status) setUpdaterText(p.status);
         });
 
         registerWindowStateCallback((state) => {
@@ -239,6 +268,16 @@ function App() {
         }
     }, [loaded, appState.config?.quickstart_viewed, appState.config?.light_mode, appState.config?.speech_to_text_only]);
 
+    React.useEffect(() => {
+        if (!updaterVisible || !appState.config?.quickstart_viewed || updating || updateError || autoCountdown === null) return;
+        if (autoCountdown <= 0) {
+            startAutoUpdateNow(appState.config.language);
+            return;
+        }
+        const timer = window.setTimeout(() => setAutoCountdown(c => (c !== null ? c - 1 : null)), 1000);
+        return () => window.clearTimeout(timer);
+    }, [updaterVisible, appState.config?.quickstart_viewed, appState.config?.language, updating, updateError, autoCountdown, startAutoUpdateNow]);
+
     const handleOpacityChange = (val: number) => {
         const clamped = Math.max(0, Math.min(100, val));
         setLocalGlassOpacity(clamped);
@@ -309,47 +348,67 @@ function App() {
 
                     {/* Updater Modal */}
                     <div
-                        className={'transition-all z-50 w-full h-screen flex backdrop-blur-md bg-black/45 justify-center items-center absolute inset-0' + (updaterVisible && appState.config.quickstart_viewed ? " opacity-100" : " opacity-0 pointer-events-none")}>
-                        <div className="flex flex-col items-center w-[440px] p-7 liquid-glass-sheet rounded-3xl gap-4">
+                        className={'transition-all z-50 w-full h-screen flex backdrop-blur-md bg-black/45 justify-center items-center absolute inset-0' + (updaterVisible && appState.config.quickstart_viewed ? " opacity-100 pointer-events-auto" : " opacity-0 pointer-events-none")}>
+                        <div className="flex flex-col items-center w-[460px] max-w-[92vw] p-7 liquid-glass-sheet rounded-3xl gap-4">
                             {(!appState.is_linux || appState.is_appimage) && (
                                 <>
                                     <div className="flex flex-col items-center text-center">
-                                        <p className="text-lg font-semibold tracking-tight apple-text-primary">{updaterText}</p>
-                                        {!showProgress && <p className="text-xs font-mono apple-text-secondary mt-1">{newVersion}</p>}
+                                        <p className="text-base font-semibold tracking-tight apple-text-primary">{updaterText}</p>
+                                        <p className="text-xs font-mono apple-text-secondary mt-1.5">
+                                            v{appVersion} → v{newVersion}
+                                        </p>
+                                        {autoCountdown !== null && !updating && !updateError && (
+                                            <p className="text-[11px] apple-text-tertiary mt-1.5">
+                                                将在 {autoCountdown} 秒后自动下载并更新...
+                                            </p>
+                                        )}
                                     </div>
-                                    <div className="flex gap-3 mt-2">
-                                        <Button
-                                            variant="contained"
-                                            disabled={updating}
-                                            className='!h-9 !px-5 !bg-[var(--accent-blue)] !text-white !font-semibold !rounded-xl'
-                                            onClick={() => {
-                                                setUpdating(true);
-                                                setTimeout(() => {
-                                                    setShowProgress(true);
-                                                    setUpdaterText(localization.updating[appState.config.language]);
-                                                    update();
-                                                }, 300);
-                                            }}>
-                                            <DownloadOutlined fontSize="small" className="mr-1.5" />
-                                            <span className="text-xs">{localization.update[appState.config.language]}</span>
-                                        </Button>
+
+                                    {showProgress && (
+                                        <div className="w-full flex flex-col gap-1.5 mt-1">
+                                            <div className="w-full h-2 rounded-full liquid-glass-well overflow-hidden">
+                                                <div
+                                                    className="h-full rounded-full bg-[var(--accent-blue)] transition-all duration-200"
+                                                    style={{ width: `${Math.max(4, updatePercent)}%` }}
+                                                />
+                                            </div>
+                                            <div className="flex items-center justify-between text-[11px] font-mono apple-text-secondary">
+                                                <span>自动更新中</span>
+                                                <span>{updatePercent}%</span>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {updateError && (
+                                        <p className="text-xs text-red-400 text-center leading-relaxed break-words">
+                                            {updateError}
+                                        </p>
+                                    )}
+
+                                    <div className="flex gap-3 mt-1">
+                                        {!updating && (
+                                            <Button
+                                                variant="contained"
+                                                className='!h-9 !px-5 !bg-[var(--accent-blue)] !text-white !font-semibold !rounded-xl'
+                                                onClick={() => startAutoUpdateNow(appState.config.language)}
+                                            >
+                                                <DownloadOutlined fontSize="small" className="mr-1.5" />
+                                                <span className="text-xs">{updateError ? "重试更新" : localization.update[appState.config.language]}</span>
+                                            </Button>
+                                        )}
                                         <Button
                                             variant="outlined"
                                             disabled={updating}
                                             className='!h-9 !px-5 !border-[var(--border-glass-strong)] !text-[var(--text-primary)] !rounded-xl'
                                             onClick={() => {
                                                 updateViewed = true;
+                                                setAutoCountdown(null);
                                                 setUpdaterVisible(false);
                                             }}>
                                             <Clear fontSize="small" className="mr-1" />
                                             <span className="text-xs">{localization.close[appState.config.language]}</span>
                                         </Button>
                                     </div>
-                                    {showProgress && (
-                                        <div className="flex items-center justify-center my-2">
-                                            <CircularProgress size={32} sx={{ color: "var(--accent-blue)" }} />
-                                        </div>
-                                    )}
                                 </>
                             )}
                         </div>
@@ -372,6 +431,7 @@ function App() {
                             className={'transition-all z-40 w-full h-screen flex backdrop-blur-md bg-black/40 justify-center items-center absolute inset-0' + (changelogsVisible ? " opacity-100 pointer-events-auto" : " opacity-0 pointer-events-none")}>
                             <div className="flex flex-col w-[92vw] max-w-[860px] h-[82vh] rounded-3xl liquid-glass-sheet overflow-hidden">
                                 <Changelogs state={appState} closeCallback={() => {
+                                    changelogDismissedRef.current = true;
                                     setConfig("last_version", appState.app_version);
                                     setChangelogsVisible(false);
                                 }}/>

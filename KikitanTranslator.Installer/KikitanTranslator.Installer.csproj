@@ -2,22 +2,24 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net9.0-windows</TargetFramework>
-    <UseWindowsForms>true</UseWindowsForms>
+    <UseWPF>true</UseWPF>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <ApplicationHighDpiMode>SystemAware</ApplicationHighDpiMode>
-    <AssemblyName>Installer-win64</AssemblyName>
+    <AssemblyName>KikitanTranslator-Setup</AssemblyName>
+    <RootNamespace>KikitanInstaller</RootNamespace>
     <Product>Kikitan Translator Setup</Product>
     <Company>Kikitan</Company>
-    <Version>2.2.3</Version>
+    <Version>2.3.0</Version>
     <ApplicationIcon>..\KikitanTranslator.Photino\Resources\wwwroot\kikitan_logo.ico</ApplicationIcon>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
-    <SelfContained>false</SelfContained>
-    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
   </PropertyGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="payload.zip" Condition="Exists('payload.zip')" />
+    <EmbeddedResource Include="payload.zip" Condition="Exists('payload.zip')" LogicalName="KikitanInstaller.payload.zip" />
     <EmbeddedResource Include="..\KikitanTranslator.Photino\Resources\wwwroot\kikitan_logo.ico" LogicalName="app_icon.ico" />
   </ItemGroup>
 </Project>

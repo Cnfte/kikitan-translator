@@ -177,6 +177,35 @@ public class UpdateConfig(Manager manager) : IHandler
                 doNotRestart = true;
 
                 break;
+            case "desktop_overlay_enabled":
+                AppConfig.ConfigObject.DesktopOverlayEnabled = (bool) d.Value;
+                doNotRestart = true;
+
+                break;
+            case "overlay_position":
+                AppConfig.ConfigObject.OverlayPosition = Convert.ToInt32(d.Value);
+                doNotRestart = true;
+
+                break;
+            case "overlay_scale":
+                AppConfig.ConfigObject.OverlayScale = Convert.ToInt32(d.Value);
+                doNotRestart = true;
+
+                break;
+            case "quick_phrases":
+                AppConfig.ConfigObject.QuickPhrases = d.Value is JArray phrases
+                    ? phrases.ToObject<List<string>>() ?? []
+                    : [];
+                doNotRestart = true;
+
+                break;
+            case "custom_glossary":
+                AppConfig.ConfigObject.CustomGlossary = d.Value is JArray glossary
+                    ? glossary.ToObject<List<GlossaryEntry>>() ?? []
+                    : [];
+                doNotRestart = true;
+
+                break;
             default:
                 if (!TryApplyField(d.Field, d.Value))
                 {

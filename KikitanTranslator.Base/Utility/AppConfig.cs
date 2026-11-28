@@ -5,6 +5,12 @@ using Serilog;
 
 namespace KikitanTranslator.Utility;
 
+public class GlossaryEntry
+{
+    [JsonProperty("source")] public string Source { get; set; } = string.Empty;
+    [JsonProperty("target")] public string Target { get; set; } = string.Empty;
+}
+
 public class ConfigObject : INotifyPropertyChanged
 {
     [JsonProperty("quickstart_viewed")] private bool _quickstartViewed;
@@ -787,6 +793,69 @@ public class ConfigObject : INotifyPropertyChanged
             }
         }
     }
+
+    [JsonProperty("desktop_overlay_enabled")] private bool _desktopOverlayEnabled = true;
+
+    [JsonIgnore]
+    public bool DesktopOverlayEnabled
+    {
+        get => _desktopOverlayEnabled;
+        set { if (_desktopOverlayEnabled != value) { _desktopOverlayEnabled = value; OnPropertyChanged(); } }
+    }
+
+    /// <summary>0=BottomCenter, 1=BottomLeft, 2=BottomRight, 3=TopCenter, 4=TopLeft, 5=TopRight</summary>
+    [JsonProperty("overlay_position")] private int _overlayPosition = 0;
+
+    [JsonIgnore]
+    public int OverlayPosition
+    {
+        get => Math.Clamp(_overlayPosition, 0, 5);
+        set
+        {
+            int clamped = Math.Clamp(value, 0, 5);
+            if (_overlayPosition != clamped) { _overlayPosition = clamped; OnPropertyChanged(); }
+        }
+    }
+
+    [JsonProperty("overlay_scale")] private int _overlayScale = 100;
+
+    [JsonIgnore]
+    public int OverlayScale
+    {
+        get => Math.Clamp(_overlayScale, 75, 150);
+        set
+        {
+            int clamped = Math.Clamp(value, 75, 150);
+            if (_overlayScale != clamped) { _overlayScale = clamped; OnPropertyChanged(); }
+        }
+    }
+
+    [JsonProperty("quick_phrases")] private List<string> _quickPhrases =
+    [
+        "你好！很高兴认识你",
+        "稍等我一下，马上回来",
+        "不好意思，我听不太清，可以再说一遍吗？",
+        "你的虚拟形象真好看！",
+        "感谢带路，这个世界好漂亮",
+        "拜拜，下次再一起玩！"
+    ];
+
+    [JsonIgnore]
+    public List<string> QuickPhrases
+    {
+        get => _quickPhrases ??= [];
+        set { _quickPhrases = value ?? []; OnPropertyChanged(); }
+    }
+
+    [JsonProperty("custom_glossary")] private List<GlossaryEntry> _customGlossary = [];
+
+    [JsonIgnore]
+    public List<GlossaryEntry> CustomGlossary
+    {
+        get => _customGlossary ??= [];
+        set { _customGlossary = value ?? []; OnPropertyChanged(); }
+    }
+
     public event PropertyChangedEventHandler? PropertyChanged;
 
     protected void OnPropertyChanged([CallerMemberName] string propertyName = null)

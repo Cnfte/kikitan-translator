@@ -49,6 +49,16 @@ export type config = {
     ai_semantic_correction_provider: string;
     ai_semantic_correction_prompt: string;
     glass_opacity?: number;
+    desktop_overlay_enabled?: boolean;
+    overlay_position?: number;
+    overlay_scale?: number;
+    quick_phrases?: string[];
+    custom_glossary?: glossary_entry[];
+}
+
+export type glossary_entry = {
+    source: string;
+    target: string;
 }
 
 export type custom_provider = {
@@ -75,7 +85,8 @@ export type app_state = {
     config: config;
     status: 0 | 1 | 2;
     app_version: string;
-    server_version: string;
+    server_version: string | null;
+    changelog_file?: string;
     is_linux: boolean;
     is_appimage: boolean;
     is_muted: boolean;

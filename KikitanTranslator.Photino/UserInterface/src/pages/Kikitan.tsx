@@ -26,6 +26,12 @@ import {
     ContentCopy as ContentCopyIcon,
     Check as CheckIcon,
     GraphicEq as GraphicEqIcon,
+    Bolt as BoltIcon,
+    Add as AddIcon,
+    DeleteOutline as DeleteIcon,
+    Download as DownloadIcon,
+    Search as SearchIcon,
+    Replay as ReplayIcon,
 } from "@mui/icons-material";
 
 import {
@@ -51,6 +57,9 @@ export default function Kikitan({ state }: { state: app_state }) {
     const [detection, setDetection] = React.useState<string>("");
     const [translation, setTranslation] = React.useState<string>("");
     const [showMessageHistory, setShowMessageHistory] = React.useState(false);
+    const [showQuickPhrases, setShowQuickPhrases] = React.useState(false);
+    const [newPhrase, setNewPhrase] = React.useState("");
+    const [historyQuery, setHistoryQuery] = React.useState("");
     const [textInputValue, setTextInputValue] = React.useState("");
     const [copied, setCopied] = React.useState(false);
 
@@ -101,13 +110,13 @@ export default function Kikitan({ state }: { state: app_state }) {
             if (f) {
                 setMessageHistory(prev => {
                     let copy = [...prev];
-                    if (copy.length >= 50) copy = copy.slice(0, 49);
+                    if (copy.length >= 100) copy = copy.slice(0, 99);
                     copy.unshift({
                         source: r,
                         translation: t,
                         timestamp: Date.now()
                     });
-                    sessionStorage.setItem("history", JSON.stringify(copy));
+                    localStorage.setItem("kikitan_history_v1", JSON.stringify(copy));
                     return copy;
                 });
             }
@@ -117,9 +126,10 @@ export default function Kikitan({ state }: { state: app_state }) {
         registerNotificationCallback((msg: string, level: number) => showNotification(msg, level == 1 ? "warning" : level == 2 ? "error" : level == 3 ? "success" : "info"));
         controlKikitan(true);
 
-        if (sessionStorage.getItem("history") != null) {
+        const saved = localStorage.getItem("kikitan_history_v1") ?? sessionStorage.getItem("history");
+        if (saved != null) {
             try {
-                setMessageHistory(JSON.parse(sessionStorage.getItem("history")!));
+                setMessageHistory(JSON.parse(saved));
             } catch (e) {
                 console.error(e);
             }
@@ -143,6 +153,49 @@ export default function Kikitan({ state }: { state: app_state }) {
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
     };
+
+    const quickPhrases = state.config.quick_phrases ?? [];
+
+    const handleAddQuickPhrase = () => {
+        const clean = newPhrase.trim();
+        if (!clean) return;
+        if (!quickPhrases.includes(clean)) {
+            setConfig("quick_phrases", [...quickPhrases, clean]);
+        }
+        setNewPhrase("");
+    };
+
+    const handleRemoveQuickPhrase = (phrase: string) => {
+        setConfig("quick_phrases", quickPhrases.filter(p => p !== phrase));
+    };
+
+    const handleExportHistory = () => {
+        if (messageHistory.length === 0) return;
+        const lines = [...messageHistory]
+            .reverse()
+            .map(item => `[${new Date(item.timestamp).toLocaleString()}]\n原文: ${item.source}\n译文: ${item.translation}\n`);
+        const blob = new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `kikitan-history-${new Date().toISOString().slice(0, 10)}.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
+    const handleClearHistory = () => {
+        setMessageHistory([]);
+        localStorage.removeItem("kikitan_history_v1");
+        sessionStorage.removeItem("history");
+    };
+
+    const filteredHistory = React.useMemo(() => {
+        const q = historyQuery.trim().toLowerCase();
+        if (!q) return messageHistory;
+        return messageHistory.filter(item =>
+            item.source.toLowerCase().includes(q) || item.translation.toLowerCase().includes(q)
+        );
+    }, [messageHistory, historyQuery]);
 
     const isRunning = state.status === 2;
     const isBusy = state.status === 1;
@@ -402,28 +455,102 @@ export default function Kikitan({ state }: { state: app_state }) {
                     </button>
                 </Tooltip>
 
-                {/* Integrated Apple iMessage-Style Input Capsule */}
-                <div className="flex-1 flex items-center h-9 rounded-full liquid-glass-well pl-3.5 sm:pl-4 pr-1 gap-2 min-w-[90px]">
-                    <input
-                        type="text"
-                        placeholder={localization.type_message_placeholder?.[state.config.language] ?? "输入内容并按 Enter 发送至 VRChat..."}
-                        value={textInputValue}
-                        onChange={(e) => setTextInputValue(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                                handleSendManual();
-                            }
-                        }}
-                        className="flex-1 bg-transparent border-none outline-none text-xs apple-text-primary placeholder:apple-text-tertiary min-w-0"
-                    />
-                    <button
-                        onClick={handleSendManual}
-                        disabled={!textInputValue.trim()}
-                        className="w-7 h-7 rounded-full bg-[var(--accent-blue)] text-white flex items-center justify-center disabled:opacity-30 transition-all shrink-0"
-                        title={localization.send[state.config.language]}
-                    >
-                        <SendIcon sx={{ fontSize: 15 }} />
-                    </button>
+                {/* Quick Phrases Drawer (Expandable above dock) */}
+                <div className="relative flex-1 flex items-center min-w-[90px]">
+                    {showQuickPhrases && (
+                        <div className="absolute bottom-12 left-0 right-0 z-40 liquid-glass-sheet rounded-2xl p-3.5 shadow-2xl border border-[var(--border-glass-strong)] flex flex-col gap-2.5">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-semibold apple-text-primary flex items-center gap-1.5">
+                                    <BoltIcon sx={{ fontSize: 15, color: "var(--accent-blue)" }} />
+                                    {localization.quick_phrases[state.config.language]}
+                                </span>
+                                <button
+                                    onClick={() => setShowQuickPhrases(false)}
+                                    className="apple-text-tertiary hover:apple-text-primary p-0.5 rounded-full"
+                                >
+                                    <CloseIcon sx={{ fontSize: 15 }} />
+                                </button>
+                            </div>
+                            <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto">
+                                {quickPhrases.map((phrase, idx) => (
+                                    <div
+                                        key={`${phrase}-${idx}`}
+                                        className="group flex items-center gap-1 rounded-full liquid-glass-well pl-3 pr-1.5 py-1 border border-[var(--border-glass)] hover:border-[var(--accent-blue)] transition-all"
+                                    >
+                                        <button
+                                            onClick={() => {
+                                                manualTranslate(phrase);
+                                                setShowQuickPhrases(false);
+                                            }}
+                                            className="text-xs apple-text-primary hover:text-[var(--accent-blue)] text-left"
+                                        >
+                                            {phrase}
+                                        </button>
+                                        <button
+                                            onClick={() => handleRemoveQuickPhrase(phrase)}
+                                            className="opacity-50 group-hover:opacity-100 apple-text-tertiary hover:text-red-400 p-0.5 rounded-full"
+                                        >
+                                            <CloseIcon sx={{ fontSize: 12 }} />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="flex items-center gap-1.5 pt-1 border-t apple-divider">
+                                <input
+                                    type="text"
+                                    value={newPhrase}
+                                    onChange={(e) => setNewPhrase(e.target.value)}
+                                    onKeyDown={(e) => { if (e.key === "Enter") handleAddQuickPhrase(); }}
+                                    placeholder={localization.quick_phrase_placeholder[state.config.language]}
+                                    className="flex-1 bg-transparent text-xs apple-text-primary placeholder:apple-text-tertiary outline-none px-2 py-1"
+                                />
+                                <button
+                                    onClick={handleAddQuickPhrase}
+                                    disabled={!newPhrase.trim()}
+                                    className="h-7 px-2.5 rounded-full bg-[var(--accent-blue)] text-white text-xs font-semibold flex items-center gap-1 disabled:opacity-35"
+                                >
+                                    <AddIcon sx={{ fontSize: 14 }} />
+                                    <span>{localization.glossary_add[state.config.language]}</span>
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Integrated Apple iMessage-Style Input Capsule */}
+                    <div className="w-full flex items-center h-9 rounded-full liquid-glass-well pl-1.5 sm:pl-2 pr-1 gap-1.5 min-w-[90px]">
+                        <Tooltip title={localization.quick_phrases[state.config.language]}>
+                            <button
+                                onClick={() => setShowQuickPhrases(v => !v)}
+                                className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-all ${
+                                    showQuickPhrases
+                                        ? "bg-[var(--accent-blue)] text-white"
+                                        : "apple-text-secondary hover:apple-text-primary"
+                                }`}
+                            >
+                                <BoltIcon sx={{ fontSize: 16 }} />
+                            </button>
+                        </Tooltip>
+                        <input
+                            type="text"
+                            placeholder={localization.type_message_placeholder?.[state.config.language] ?? "输入内容并按 Enter 发送至 VRChat..."}
+                            value={textInputValue}
+                            onChange={(e) => setTextInputValue(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                    handleSendManual();
+                                }
+                            }}
+                            className="flex-1 bg-transparent border-none outline-none text-xs apple-text-primary placeholder:apple-text-tertiary min-w-0"
+                        />
+                        <button
+                            onClick={handleSendManual}
+                            disabled={!textInputValue.trim()}
+                            className="w-7 h-7 rounded-full bg-[var(--accent-blue)] text-white flex items-center justify-center disabled:opacity-30 transition-all shrink-0"
+                            title={localization.send[state.config.language]}
+                        >
+                            <SendIcon sx={{ fontSize: 15 }} />
+                        </button>
+                    </div>
                 </div>
 
                 {/* History Sheet Trigger */}
@@ -443,46 +570,76 @@ export default function Kikitan({ state }: { state: app_state }) {
             {/* 3. Message History Sheet Modal */}
             {showMessageHistory && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-md bg-black/40 p-4">
-                    <div className="flex flex-col w-full max-w-[720px] h-[76vh] liquid-glass-sheet rounded-3xl p-6 overflow-hidden">
+                    <div className="flex flex-col w-full max-w-[740px] h-[78vh] liquid-glass-sheet rounded-3xl p-6 overflow-hidden">
                         
-                        <div className="flex items-center justify-between pb-3.5 border-b apple-divider">
+                        <div className="flex items-center justify-between gap-3 pb-3.5 border-b apple-divider">
                             <div className="flex items-center gap-2">
                                 <HistoryIcon sx={{ fontSize: 19 }} className="apple-text-primary" />
                                 <h2 className="text-base font-semibold apple-text-primary tracking-tight">
                                     {localization.message_history[state.config.language]}
                                 </h2>
                                 <span className="font-mono text-xs apple-text-tertiary">
-                                    ({messageHistory.length})
+                                    ({filteredHistory.length}/{messageHistory.length})
                                 </span>
                             </div>
-                            <IconButton
-                                onClick={() => setShowMessageHistory(false)}
-                                size="small"
-                                sx={{ color: "var(--text-primary)", border: "1px solid var(--border-glass)", borderRadius: "9999px", p: 0.7 }}
-                            >
-                                <CloseIcon fontSize="small" />
-                            </IconButton>
+                            <div className="flex items-center gap-2">
+                                <div className="flex items-center h-8 rounded-full liquid-glass-well px-3 gap-1.5 w-44 sm:w-56">
+                                    <SearchIcon sx={{ fontSize: 15 }} className="apple-text-tertiary" />
+                                    <input
+                                        type="text"
+                                        value={historyQuery}
+                                        onChange={(e) => setHistoryQuery(e.target.value)}
+                                        placeholder={localization.history_search[state.config.language]}
+                                        className="flex-1 bg-transparent border-none outline-none text-xs apple-text-primary placeholder:apple-text-tertiary min-w-0"
+                                    />
+                                </div>
+                                <IconButton
+                                    onClick={() => setShowMessageHistory(false)}
+                                    size="small"
+                                    sx={{ color: "var(--text-primary)", border: "1px solid var(--border-glass)", borderRadius: "9999px", p: 0.7 }}
+                                >
+                                    <CloseIcon fontSize="small" />
+                                </IconButton>
+                            </div>
                         </div>
 
                         <div className="flex-1 overflow-y-auto py-3.5 space-y-2.5">
-                            {messageHistory.length === 0 ? (
+                            {filteredHistory.length === 0 ? (
                                 <div className="flex items-center justify-center h-full apple-text-tertiary text-xs">
                                     {localization.no_history[state.config.language]}
                                 </div>
                             ) : (
-                                messageHistory.map((item, index) => (
+                                filteredHistory.map((item, index) => (
                                     <div
-                                        key={index}
+                                        key={`${item.timestamp}-${index}`}
                                         className="p-4 rounded-2xl liquid-glass-well flex flex-col gap-1.5"
                                     >
                                         <div className="flex items-center justify-between text-[11px] font-mono apple-text-tertiary">
-                                            <span>#{messageHistory.length - index}</span>
-                                            <span>{formatTimestamp(item.timestamp)}</span>
+                                            <span>#{filteredHistory.length - index} · {formatTimestamp(item.timestamp)}</span>
+                                            <div className="flex items-center gap-1.5 font-sans">
+                                                <button
+                                                    onClick={() => handleCopy(item.translation || item.source)}
+                                                    className="px-2 py-0.5 rounded-full liquid-glass-clear apple-text-secondary hover:apple-text-primary flex items-center gap-1 text-[11px]"
+                                                >
+                                                    <ContentCopyIcon sx={{ fontSize: 12 }} />
+                                                    <span>复制</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        manualTranslate(item.source);
+                                                        setShowMessageHistory(false);
+                                                    }}
+                                                    className="px-2 py-0.5 rounded-full badge-pastel-blue flex items-center gap-1 text-[11px] font-medium"
+                                                >
+                                                    <ReplayIcon sx={{ fontSize: 12 }} />
+                                                    <span>{localization.history_resend[state.config.language]}</span>
+                                                </button>
+                                            </div>
                                         </div>
-                                        <div className="text-xs apple-text-secondary">
+                                        <div className="text-xs apple-text-secondary select-text">
                                             {item.source}
                                         </div>
-                                        <div className="text-sm font-semibold apple-text-primary pt-1 border-t apple-divider">
+                                        <div className="text-sm font-semibold apple-text-primary pt-1 border-t apple-divider select-text">
                                             {item.translation}
                                         </div>
                                     </div>
@@ -490,7 +647,29 @@ export default function Kikitan({ state }: { state: app_state }) {
                             )}
                         </div>
 
-                        <div className="pt-3 border-t apple-divider flex justify-end">
+                        <div className="pt-3 border-t apple-divider flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    size="small"
+                                    variant="outlined"
+                                    disabled={messageHistory.length === 0}
+                                    startIcon={<DownloadIcon fontSize="small" />}
+                                    onClick={handleExportHistory}
+                                    sx={{ color: "var(--text-primary)", borderColor: "var(--border-glass-strong)", borderRadius: "9999px", fontSize: "0.75rem", textTransform: "none" }}
+                                >
+                                    {localization.history_export[state.config.language]}
+                                </Button>
+                                <Button
+                                    size="small"
+                                    variant="outlined"
+                                    disabled={messageHistory.length === 0}
+                                    startIcon={<DeleteIcon fontSize="small" />}
+                                    onClick={handleClearHistory}
+                                    sx={{ color: "#f87171", borderColor: "rgba(248,113,113,0.35)", borderRadius: "9999px", fontSize: "0.75rem", textTransform: "none" }}
+                                >
+                                    {localization.history_clear[state.config.language]}
+                                </Button>
+                            </div>
                             <Button
                                 variant="contained"
                                 onClick={() => setShowMessageHistory(false)}

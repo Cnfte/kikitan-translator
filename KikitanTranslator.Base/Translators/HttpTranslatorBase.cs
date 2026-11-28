@@ -115,8 +115,28 @@ public abstract class HttpTranslatorBase : ITranslator
 
     protected abstract string? ParseResponse(string body);
 
-    protected static string BuildPrompt(string source, string target) =>
-        Constants.TRANSLATION_PROMPT.Replace("LANG_SRC", source).Replace("LANG_TARGET", target);
+    protected static string BuildPrompt(string source, string target)
+    {
+        var prompt = Constants.TRANSLATION_PROMPT.Replace("LANG_SRC", source).Replace("LANG_TARGET", target);
+
+        var glossary = AppConfig.ConfigObject.CustomGlossary;
+        if (glossary is { Count: > 0 })
+        {
+            var valid = glossary.Where(g => !string.IsNullOrWhiteSpace(g.Source) && !string.IsNullOrWhiteSpace(g.Target)).Take(40).ToList();
+            if (valid.Count > 0)
+            {
+                var sb = new System.Text.StringBuilder(prompt);
+                sb.Append("\n\nCustom glossary (strictly apply these term mappings when relevant):");
+                foreach (var entry in valid)
+                {
+                    sb.Append($"\n- {entry.Source.Trim()} => {entry.Target.Trim()}");
+                }
+                return sb.ToString();
+            }
+        }
+
+        return prompt;
+    }
 
     protected static string? ReadText(JsonElement element) => element.ValueKind switch
     {

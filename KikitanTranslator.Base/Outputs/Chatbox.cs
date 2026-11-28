@@ -87,14 +87,7 @@ public class Chatbox : IOutput
 
             if (!final && !AppConfig.ConfigObject.SendWithoutWaitingForFinish) return;
 
-            string messageToSend;
-            if (AppConfig.ConfigObject.SpeechToTextOnly)
-                messageToSend = recognized;
-            else if (AppConfig.ConfigObject.TranslationOnly)
-                messageToSend = translated;
-            else
-                messageToSend = $"{translated} ({recognized})";
-
+            string messageToSend = FormatChatboxMessage(recognized, translated);
             if (string.IsNullOrWhiteSpace(messageToSend)) return;
 
             var inputPacket = BuildChatboxInputPacket(messageToSend, true, true);
@@ -111,6 +104,42 @@ public class Chatbox : IOutput
         {
             Log.Error($"[OSC] Error sending OSC message! Reason: {e}");
         }
+    }
+
+    private const int MaxChatboxLength = 144;
+
+    /// <summary>
+    /// Enforces VRChat's 144-character /chatbox/input limit while prioritizing the full translation
+    /// so long bilingual sentences are never silently rejected or truncated mid-translation.
+    /// </summary>
+    private static string FormatChatboxMessage(string recognized, string translated)
+    {
+        string orig = (recognized ?? string.Empty).Replace("\r", "").Replace("\n", " ").Trim();
+        string trans = (translated ?? string.Empty).Replace("\r", "").Replace("\n", " ").Trim();
+
+        if (AppConfig.ConfigObject.SpeechToTextOnly) return TrimToLimit(orig, MaxChatboxLength);
+        if (AppConfig.ConfigObject.TranslationOnly || string.IsNullOrEmpty(orig)) return TrimToLimit(trans, MaxChatboxLength);
+        if (string.IsNullOrEmpty(trans)) return TrimToLimit(orig, MaxChatboxLength);
+
+        string combined = $"{trans} ({orig})";
+        if (combined.Length <= MaxChatboxLength) return combined;
+
+        // Preserve full translation first; trim original parenthetical to fit within 144 chars
+        int overhead = 3; // " (" + ")"
+        int remainingForOrig = MaxChatboxLength - trans.Length - overhead;
+        if (remainingForOrig >= 6)
+        {
+            return $"{trans} ({TrimToLimit(orig, remainingForOrig)})";
+        }
+
+        return TrimToLimit(trans, MaxChatboxLength);
+    }
+
+    private static string TrimToLimit(string text, int maxLen)
+    {
+        if (string.IsNullOrEmpty(text) || text.Length <= maxLen) return text;
+        if (maxLen <= 1) return text[..Math.Max(0, maxLen)];
+        return text[..(maxLen - 1)].TrimEnd() + "…";
     }
 
     public bool IsDelayed() => true;

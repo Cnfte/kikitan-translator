@@ -9,6 +9,14 @@ public class Constants
     /// </summary>
     public static readonly string UPDATE_FEED_URL = "";
 
+    public static readonly string CLOUD_UPDATE_MANIFEST_URL =
+        "https://v4.gh-proxy.org/https://raw.githubusercontent.com/Cnfte/kikitan-translator/refs/heads/main/gx.txt";
+
+    public static readonly string CLOUD_CHANGELOG_BASE_URL =
+        "https://v4.gh-proxy.org/https://raw.githubusercontent.com/Cnfte/kikitan-translator/refs/heads/main/";
+
+    public static readonly string DEFAULT_CHANGELOG_FILE = "CHANGELOG.md";
+
     public static readonly string BING_TRUSTED_TOKEN = "6A5AA1D4EAFF4E9FB37E23D68491D6F4";
     public static readonly string BING_MS_VERSION = "1-145.0.3800.70";
 

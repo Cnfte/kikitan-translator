@@ -1,4 +1,5 @@
-﻿using Serilog;
+﻿using KikitanTranslator.Utility;
+using Serilog;
 
 namespace KikitanTranslator.Photino.Handlers;
 
@@ -8,11 +9,13 @@ public class Fetch : IHandler
     {
         try
         {
-            return await new HttpClient().GetStringAsync(data);
-        } catch (Exception e)
+            using var client = NetworkClientFactory.Create(TimeSpan.FromSeconds(20));
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("KikitanTranslator/2.3.0");
+            return await client.GetStringAsync(data);
+        }
+        catch (Exception e)
         {
             Log.Error($"[MSGH] Error when fetching from url {data}!: {e}");
-
             return "";
         }
     }

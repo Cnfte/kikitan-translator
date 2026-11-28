@@ -95,9 +95,11 @@ public class Kikitan : IDisposable
                 }
             }
 
+            var textForTranslate = _translator is GoogleTranslate ? ApplyGlossaryForNonLlm(textToProcess) : textToProcess;
+
             var translationTimer = System.Diagnostics.Stopwatch.StartNew();
-            Log.Debug($"[KKTN] Translation started: desktop={_isLoopback}, translator={_translator.GetType().Name}, chars={textToProcess.Length}, transcriptionOnly={AppConfig.ConfigObject.SpeechToTextOnly}");
-            var translated = AppConfig.ConfigObject.SpeechToTextOnly ? "" : _isLoopback ? _translator.Translate(textToProcess, AppConfig.ConfigObject.TargetLanguage, AppConfig.ConfigObject.SourceLanguage) : _translator.Translate(textToProcess, AppConfig.ConfigObject.SourceLanguage, AppConfig.ConfigObject.TargetLanguage);
+            Log.Debug($"[KKTN] Translation started: desktop={_isLoopback}, translator={_translator.GetType().Name}, chars={textForTranslate.Length}, transcriptionOnly={AppConfig.ConfigObject.SpeechToTextOnly}");
+            var translated = AppConfig.ConfigObject.SpeechToTextOnly ? "" : _isLoopback ? _translator.Translate(textForTranslate, AppConfig.ConfigObject.TargetLanguage, AppConfig.ConfigObject.SourceLanguage) : _translator.Translate(textForTranslate, AppConfig.ConfigObject.SourceLanguage, AppConfig.ConfigObject.TargetLanguage);
         
             Log.Debug($"[KKTN] Translation completed: desktop={_isLoopback}, elapsedMs={translationTimer.ElapsedMilliseconds}, resultChars={translated?.Length}, hasResult={translated != null}");
             if (translated == null) Log.Warning($"[KKTN] No translation result; final output skipped: desktop={_isLoopback}");
@@ -118,6 +120,20 @@ public class Kikitan : IDisposable
             
             _errorHandler.OnError($"Error while translating: {e.Message}");
         }
+    }
+
+    private static string ApplyGlossaryForNonLlm(string input)
+    {
+        var glossary = AppConfig.ConfigObject.CustomGlossary;
+        if (glossary == null || glossary.Count == 0 || string.IsNullOrEmpty(input)) return input;
+
+        string result = input;
+        foreach (var entry in glossary)
+        {
+            if (string.IsNullOrWhiteSpace(entry.Source) || string.IsNullOrWhiteSpace(entry.Target)) continue;
+            result = result.Replace(entry.Source.Trim(), entry.Target.Trim(), StringComparison.OrdinalIgnoreCase);
+        }
+        return result;
     }
 
     private void OnRecognizerStatus(RecognizerStatus status) => OnRecognizerStatusChanged?.Invoke(status);

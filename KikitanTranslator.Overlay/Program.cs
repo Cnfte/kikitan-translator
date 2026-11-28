@@ -38,13 +38,14 @@ static class Program
         
         if (Screen.PrimaryScreen != null)
         {
+            Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
             // Working area = screen without the taskbar, so the overlay can never cover it.
             Rectangle bounds = Screen.PrimaryScreen.WorkingArea;
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             
             var form = new Form1(bounds);
-            server.StartForm(form);
+            server.StartForm(form, bounds);
             
             Application.Run(form);
         }

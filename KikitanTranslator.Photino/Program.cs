@@ -54,10 +54,11 @@ public class Program
         messageHandler.RegisterHandler("send_app_state", new SendState(manager));
         messageHandler.RegisterHandler("quit", new Quit());
         messageHandler.RegisterHandler("open_url", new OpenURL());
-        messageHandler.RegisterHandler("update", new UpdateApp());
+        messageHandler.RegisterHandler("update", new UpdateApp(manager));
         messageHandler.RegisterHandler("fetch", new Fetch());
         messageHandler.RegisterHandler("fetch_models", new FetchModels());
         messageHandler.RegisterHandler("test_proxy", new TestProxy());
+        messageHandler.RegisterHandler("overlay_action", new OverlayAction(manager));
 
         if (noUI)
         {

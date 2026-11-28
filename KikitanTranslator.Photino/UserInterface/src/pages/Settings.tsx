@@ -21,7 +21,7 @@ import {
 } from '@mui/icons-material';
 
 import {localization} from "../util/localization";
-import {openURL, setConfig} from "../util/photino.ts";
+import {openURL, overlayAction, setConfig} from "../util/photino.ts";
 import {app_state} from "../util/constants.ts";
 import ApiSettings from "./settings/ApiSettings";
 import ProxySettings from "./settings/ProxySettings";
@@ -48,7 +48,24 @@ function AppleSwitch({ checked, onChange }: { checked: boolean; onChange: (val: 
 
 export default function SettingsPage({ closeCallback, state }: SettingsProps) {
     const [page, setPage] = React.useState(0);
+    const [glossarySrc, setGlossarySrc] = React.useState("");
+    const [glossaryTgt, setGlossaryTgt] = React.useState("");
     const lang = state.config.language;
+    const customGlossary = state.config.custom_glossary ?? [];
+
+    const handleAddGlossary = () => {
+        const s = glossarySrc.trim();
+        const t = glossaryTgt.trim();
+        if (!s || !t) return;
+        const filtered = customGlossary.filter(item => item.source.toLowerCase() !== s.toLowerCase());
+        setConfig("custom_glossary", [...filtered, { source: s, target: t }]);
+        setGlossarySrc("");
+        setGlossaryTgt("");
+    };
+
+    const handleRemoveGlossary = (source: string) => {
+        setConfig("custom_glossary", customGlossary.filter(item => item.source !== source));
+    };
     const currentOpacity = state.config.glass_opacity ?? 55;
 
     const handleOpacitySlider = (val: number) => {
@@ -403,6 +420,71 @@ export default function SettingsPage({ closeCallback, state }: SettingsProps) {
                                     </Select>
                                 </div>
                             </div>
+
+                            {/* Custom VRChat Glossary / Name & Slang Replacements */}
+                            <div className="liquid-glass-regular rounded-2xl p-4 md:p-5 flex flex-col gap-3.5">
+                                <div>
+                                    <p className="text-xs font-semibold apple-text-primary">
+                                        {localization.custom_glossary[lang]}
+                                    </p>
+                                    <p className="text-[11px] apple-text-secondary mt-0.5 leading-relaxed">
+                                        {localization.custom_glossary_desc[lang]}
+                                    </p>
+                                </div>
+
+                                <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
+                                    <TextField
+                                        size="small"
+                                        fullWidth
+                                        placeholder={localization.glossary_source[lang]}
+                                        value={glossarySrc}
+                                        onChange={(e) => setGlossarySrc(e.target.value)}
+                                    />
+                                    <span className="text-xs apple-text-tertiary shrink-0">→</span>
+                                    <TextField
+                                        size="small"
+                                        fullWidth
+                                        placeholder={localization.glossary_target[lang]}
+                                        value={glossaryTgt}
+                                        onChange={(e) => setGlossaryTgt(e.target.value)}
+                                        onKeyDown={(e) => { if (e.key === "Enter") handleAddGlossary(); }}
+                                    />
+                                    <Button
+                                        size="small"
+                                        variant="contained"
+                                        disabled={!glossarySrc.trim() || !glossaryTgt.trim()}
+                                        onClick={handleAddGlossary}
+                                        className="!bg-[var(--accent-blue)] !text-white !font-semibold !rounded-xl !px-4 !h-9 !shrink-0"
+                                    >
+                                        {localization.glossary_add[lang]}
+                                    </Button>
+                                </div>
+
+                                {customGlossary.length === 0 ? (
+                                    <p className="text-[11px] apple-text-tertiary">
+                                        {localization.glossary_empty[lang]}
+                                    </p>
+                                ) : (
+                                    <div className="flex flex-wrap gap-1.5 pt-1">
+                                        {customGlossary.map((entry) => (
+                                            <div
+                                                key={entry.source}
+                                                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full liquid-glass-well border border-[var(--border-glass)] text-xs"
+                                            >
+                                                <span className="apple-text-secondary">{entry.source}</span>
+                                                <span className="apple-text-tertiary">→</span>
+                                                <span className="font-semibold apple-text-primary">{entry.target}</span>
+                                                <button
+                                                    onClick={() => handleRemoveGlossary(entry.source)}
+                                                    className="ml-0.5 apple-text-tertiary hover:text-red-400 text-xs font-bold leading-none"
+                                                >
+                                                    ×
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     )}
 
@@ -453,6 +535,85 @@ export default function SettingsPage({ closeCallback, state }: SettingsProps) {
                                         checked={!!state.config.send_without_waiting_for_finish}
                                         onChange={(val) => setConfig("send_without_waiting_for_finish", val)}
                                     />
+                                </div>
+
+                                <div className="border-t apple-divider pt-4 flex flex-col gap-3.5">
+                                    <div className="flex items-center justify-between gap-4">
+                                        <div>
+                                            <p className="text-xs font-semibold apple-text-primary">
+                                                {localization.desktop_overlay_enabled[lang]}
+                                            </p>
+                                            <p className="text-[11px] apple-text-secondary mt-0.5">
+                                                {localization.desktop_overlay_enabled_desc[lang]}
+                                            </p>
+                                        </div>
+                                        <AppleSwitch
+                                            checked={state.config.desktop_overlay_enabled ?? true}
+                                            onChange={(val) => setConfig("desktop_overlay_enabled", val)}
+                                        />
+                                    </div>
+
+                                    {(state.config.desktop_overlay_enabled ?? true) && (
+                                        <div className="p-3.5 liquid-glass-well rounded-xl flex flex-col gap-3">
+                                            <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3">
+                                                <span className="text-xs apple-text-secondary">
+                                                    {localization.overlay_position[lang]}
+                                                </span>
+                                                <Select
+                                                    size="small"
+                                                    sx={{ minWidth: 160, fontSize: "0.82rem" }}
+                                                    value={state.config.overlay_position ?? 0}
+                                                    onChange={(e) => setConfig("overlay_position", Number(e.target.value))}
+                                                >
+                                                    <MenuItem value={0}>{localization.overlay_pos_bottom_center[lang]}</MenuItem>
+                                                    <MenuItem value={1}>{localization.overlay_pos_bottom_left[lang]}</MenuItem>
+                                                    <MenuItem value={2}>{localization.overlay_pos_bottom_right[lang]}</MenuItem>
+                                                    <MenuItem value={3}>{localization.overlay_pos_top_center[lang]}</MenuItem>
+                                                    <MenuItem value={4}>{localization.overlay_pos_top_left[lang]}</MenuItem>
+                                                    <MenuItem value={5}>{localization.overlay_pos_top_right[lang]}</MenuItem>
+                                                </Select>
+                                            </div>
+
+                                            <div className="flex items-center justify-between gap-4">
+                                                <span className="text-xs apple-text-secondary shrink-0">
+                                                    {localization.overlay_scale[lang]}
+                                                </span>
+                                                <div className="flex items-center gap-3 flex-1 max-w-[240px]">
+                                                    <input
+                                                        type="range"
+                                                        min={75}
+                                                        max={150}
+                                                        step={5}
+                                                        value={state.config.overlay_scale ?? 100}
+                                                        onChange={(e) => setConfig("overlay_scale", Number(e.target.value))}
+                                                        className="flex-1 accent-[var(--accent-blue)] cursor-pointer"
+                                                    />
+                                                    <span className="font-mono text-xs font-semibold apple-text-primary w-10 text-right">
+                                                        {state.config.overlay_scale ?? 100}%
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-2 pt-0.5">
+                                                <Button
+                                                    size="small"
+                                                    variant="contained"
+                                                    onClick={() => overlayAction("preview")}
+                                                    className="!bg-[var(--accent-blue)] !text-white !font-semibold !rounded-lg !text-xs !px-3.5"
+                                                >
+                                                    {localization.overlay_preview[lang]}
+                                                </Button>
+                                                <Button
+                                                    size="small"
+                                                    variant="outlined"
+                                                    onClick={() => overlayAction("clear")}
+                                                    sx={{ color: "var(--text-primary)", borderColor: "var(--border-glass-strong)", fontSize: "0.75rem", borderRadius: "8px", textTransform: "none" }}
+                                                >
+                                                    {localization.overlay_clear[lang]}
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="border-t apple-divider pt-4 flex items-center justify-between gap-4">

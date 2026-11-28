@@ -1,327 +1,262 @@
-using System.IO.MemoryMappedFiles;
 using KikitanTranslator.Overlay;
-using SkiaSharp;
-
 
 public class OverlayServer
 {
-    private Form1 _form;
-    private OpenVROverlay _openvroverlay;
+    private const int MaxEntries = 24;
+    private const long IdleHideMs = 28_000;
 
-    private bool _desktop;
+    private Form1? _form;
+    private OpenVROverlay? _openVrOverlay;
+    private int _screenWidth = 1920;
+    private int _screenHeight = 1080;
+    private float _dpiScale = 1.0f;
 
-    private async Task StartReader()
+    private readonly object _stateLock = new();
+    private readonly List<OverlayChatEntry> _entries = [];
+    private int _activeOtherIndex = -1;
+    private int _activeSelfIndex = -1;
+    private long _lastActivityTick;
+
+    private float _scrollOffset;
+    private float _targetScrollOffset;
+
+    private bool _desktopEnabled = true;
+    private int _overlayPosition;
+    private BubbleTheme _theme = new(false, 55, 0, false, true, 100);
+    private bool _hasShownOnce;
+    private bool _loopsStarted;
+
+    public void StartForm(Form1 form, Rectangle workArea)
     {
-        var reader = new OverlayReader();
-        var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(250));
+        _form = form;
+        _screenWidth = workArea.Width;
+        _screenHeight = workArea.Height;
+        _dpiScale = Math.Clamp(form.DeviceDpi / 96f, 1.0f, 3.0f);
+        StartLoops();
+    }
 
-        while (await timer.WaitForNextTickAsync())
+    public void StartOpenVR(OpenVROverlay openVrOverlay)
+    {
+        _openVrOverlay = openVrOverlay;
+        Task.Run(openVrOverlay.ImageLoop);
+        StartLoops();
+    }
+
+    private void StartLoops()
+    {
+        if (_loopsStarted) return;
+        _loopsStarted = true;
+        Task.Run(RunPipeLoop);
+    }
+
+    private async Task RunPipeLoop()
+    {
+        OverlayReader? reader = null;
+        while (reader == null)
         {
-            var state = reader.Read();
-            if (state is not null) SendText(state.Value.Text, state.Value.NoLanguageSpace, state.Value.Time);
+            try
+            {
+                reader = new OverlayReader();
+            }
+            catch
+            {
+                await Task.Delay(200);
+            }
+        }
+
+        while (true)
+        {
+            bool animating;
+            lock (_stateLock)
+            {
+                animating = MathF.Abs(_targetScrollOffset - _scrollOffset) > 0.5f;
+            }
+            await Task.Delay(animating ? 20 : 45);
+
+            var poll = reader.Poll();
+            bool shouldRenderDesktop = false;
+            bool shouldRenderVr = false;
+
+            long now = Environment.TickCount64;
+            if (poll is { } update)
+            {
+                lock (_stateLock)
+                {
+                    _desktopEnabled = update.Header.HasFlag(OverlayPipeHeader.FlagDesktopEnabled);
+                    _overlayPosition = Math.Clamp(update.Header.Position, 0, 5);
+                    _theme = new BubbleTheme(
+                        LightMode: update.Header.HasFlag(OverlayPipeHeader.FlagLightMode),
+                        GlassOpacity: update.Header.Opacity,
+                        UiLangCode: update.Header.UiLangCode,
+                        SpeechToTextOnly: update.Header.HasFlag(OverlayPipeHeader.FlagSpeechToTextOnly),
+                        NoLanguageSpace: update.Header.HasFlag(OverlayPipeHeader.FlagNoLanguageSpace),
+                        ScalePercent: update.Header.ScalePercent > 0 ? update.Header.ScalePercent : 100);
+
+                    if (update.ClearRequested)
+                    {
+                        ClearHistoryLocked();
+                        shouldRenderDesktop = true;
+                        shouldRenderVr = true;
+                    }
+
+                    foreach (var ev in update.NewEvents)
+                    {
+                        ApplyEventLocked(ev, now);
+                        shouldRenderDesktop = true;
+                        shouldRenderVr = true;
+                    }
+
+                    // Theme/toggle updates should refresh visible desktop overlay immediately
+                    if (!shouldRenderDesktop && _entries.Count > 0)
+                    {
+                        shouldRenderDesktop = true;
+                    }
+                }
+            }
+
+            lock (_stateLock)
+            {
+                // Auto-hide and reset conversation after prolonged silence
+                if (_entries.Count > 0 && _lastActivityTick > 0 && (now - _lastActivityTick) >= IdleHideMs)
+                {
+                    ClearHistoryLocked();
+                    shouldRenderDesktop = true;
+                    shouldRenderVr = true;
+                }
+                else if (MathF.Abs(_targetScrollOffset - _scrollOffset) > 0.5f)
+                {
+                    float delta = _targetScrollOffset - _scrollOffset;
+                    _scrollOffset = MathF.Abs(delta) <= 1.2f ? _targetScrollOffset : _scrollOffset + delta * 0.30f;
+                    shouldRenderDesktop = true;
+                }
+            }
+
+            if (shouldRenderDesktop || shouldRenderVr)
+            {
+                RenderCurrentState(renderDesktop: shouldRenderDesktop, renderVr: shouldRenderVr);
+            }
         }
     }
 
-    public void StartForm(Form1 form)
+    private void ApplyEventLocked(OverlayEventSlot ev, long now)
     {
-        Task.Run(StartReader);
+        string orig = ev.Original.Trim();
+        string trans = ev.Translation.Trim();
+        if (orig.Length == 0 && trans.Length == 0) return;
 
-        _form = form;
-        _desktop = true;
-    }
+        bool isOther = ev.IsOther;
+        bool isFinal = ev.IsFinal;
+        ref int activeIdx = ref (isOther ? ref _activeOtherIndex : ref _activeSelfIndex);
 
-    public void StartOpenVR(OpenVROverlay openVROverlay)
-    {
-        Task.Run(StartReader);
-
-        _openvroverlay = openVROverlay;
-        _openvroverlay.ImageLoop();
-    }
-
-    public void SendText(string text, bool noLanguageSpace, int time = 5000)
-    {
-        var img = DrawTextOnCanvas(text, noLanguageSpace, time);
-        var ms = new MemoryStream(img);
-        if (_desktop)
+        if (activeIdx >= 0 && activeIdx < _entries.Count)
         {
-            Image image = Image.FromStream(ms);
-            ms.Close();
-
-            _form.SetImage(image, time);
+            _entries[activeIdx] = new OverlayChatEntry(isOther, orig, trans, isFinal);
+            if (isFinal) activeIdx = -1;
         }
         else
         {
-            _openvroverlay.AddToQueue(ms, time);
+            _entries.Add(new OverlayChatEntry(isOther, orig, trans, isFinal));
+            activeIdx = isFinal ? -1 : _entries.Count - 1;
         }
 
-        Console.WriteLine("Image received!");
+        // Trim oldest entries beyond cap while keeping active indices aligned
+        while (_entries.Count > MaxEntries)
+        {
+            _entries.RemoveAt(0);
+            if (_activeOtherIndex >= 0) _activeOtherIndex--;
+            if (_activeSelfIndex >= 0) _activeSelfIndex--;
+        }
+
+        _lastActivityTick = now;
     }
 
-    private List<string> WrapText(string text, float fontSize, float maxWidth, SKPaint paint, bool noSpaceLanguage)
+    private void ClearHistoryLocked()
     {
-        var resultLines = new List<string>();
-        var paragraphs = text.Replace("\r\n", "\n").Split('\n');
+        _entries.Clear();
+        _activeOtherIndex = -1;
+        _activeSelfIndex = -1;
+        _scrollOffset = 0f;
+        _targetScrollOffset = 0f;
+        _lastActivityTick = 0;
+    }
 
-        foreach (var paragraph in paragraphs)
+    private void RenderCurrentState(bool renderDesktop, bool renderVr)
+    {
+        OverlayChatEntry[] snapshot;
+        BubbleTheme theme;
+        bool desktopEnabled;
+        int overlayPosition;
+        float currentScroll;
+
+        lock (_stateLock)
         {
-            if (string.IsNullOrEmpty(paragraph))
-            {
-                resultLines.Add("");
-                continue;
-            }
+            snapshot = _entries.ToArray();
+            theme = _theme;
+            desktopEnabled = _desktopEnabled;
+            overlayPosition = _overlayPosition;
+            currentScroll = _scrollOffset;
+        }
 
-            IEnumerable<string> tokens;
-            if (noSpaceLanguage)
+        if (snapshot.Length == 0)
+        {
+            _form?.ClearOverlay();
+            if (renderVr) _openVrOverlay?.ClearOverlay();
+            return;
+        }
+
+        if (renderDesktop && _form != null)
+        {
+            if (!desktopEnabled)
             {
-                var tokenList = new List<string>();
-                var wordBuffer = new System.Text.StringBuilder();
-                foreach (char c in paragraph)
-                {
-                    if (c <= 127 && !char.IsWhiteSpace(c))
-                    {
-                        wordBuffer.Append(c);
-                    }
-                    else
-                    {
-                        if (wordBuffer.Length > 0)
-                        {
-                            tokenList.Add(wordBuffer.ToString());
-                            wordBuffer.Clear();
-                        }
-                        if (!char.IsWhiteSpace(c))
-                        {
-                            tokenList.Add(c.ToString());
-                        }
-                    }
-                }
-                if (wordBuffer.Length > 0) tokenList.Add(wordBuffer.ToString());
-                tokens = tokenList;
+                if (_hasShownOnce) _form.ClearOverlay();
             }
             else
             {
-                tokens = paragraph.Split(' ');
-            }
+                var frame = OverlayBubbleRenderer.RenderConversation(
+                    snapshot,
+                    currentScroll,
+                    _screenWidth,
+                    _screenHeight,
+                    theme,
+                    encodePngForVr: false,
+                    encodeBgraForDesktop: true,
+                    dpiScale: _dpiScale,
+                    snapToBottom: false);
 
-            string currentLine = "";
-            foreach (var token in tokens)
-            {
-                string separator = (noSpaceLanguage || currentLine.Length == 0) ? "" : " ";
-                string testLine = currentLine + separator + token;
-
-                if (MeasureWidthWithFallback(testLine, fontSize, paint) <= maxWidth)
+                if (frame is { } f)
                 {
-                    currentLine = testLine;
+                    lock (_stateLock)
+                    {
+                        _targetScrollOffset = f.MaxScroll;
+                        if (_scrollOffset > f.MaxScroll) _scrollOffset = f.MaxScroll;
+                    }
+
+                    _hasShownOnce = true;
+                    _form.PresentFrame(f.BgraPremulPixels, f.Width, f.Height, overlayPosition);
                 }
-                else
+                else if (_hasShownOnce)
                 {
-                    if (!string.IsNullOrEmpty(currentLine))
-                    {
-                        resultLines.Add(currentLine.Trim());
-                        currentLine = token;
-                    }
-                    else
-                    {
-                        string sub = "";
-                        foreach (char ch in token)
-                        {
-                            if (MeasureWidthWithFallback(sub + ch, fontSize, paint) <= maxWidth)
-                            {
-                                sub += ch;
-                            }
-                            else
-                            {
-                                if (!string.IsNullOrEmpty(sub)) resultLines.Add(sub);
-                                sub = ch.ToString();
-                            }
-                        }
-                        currentLine = sub;
-                    }
+                    _form.ClearOverlay();
                 }
             }
+        }
 
-            if (!string.IsNullOrWhiteSpace(currentLine))
+        if (renderVr && _openVrOverlay != null)
+        {
+            var vrFrame = OverlayBubbleRenderer.RenderConversation(
+                snapshot,
+                0f,
+                _screenWidth,
+                _screenHeight,
+                theme,
+                encodePngForVr: true,
+                encodeBgraForDesktop: false,
+                snapToBottom: true);
+
+            if (vrFrame?.PngBytes is { Length: > 0 } png)
             {
-                resultLines.Add(currentLine.Trim());
+                _openVrOverlay.SetOverlayFrame(png, 12000);
             }
         }
-
-        return resultLines;
-    }
-
-    private byte[] DrawTextOnCanvas(string text, bool noSpaceLanguage, int time)
-    {
-        const int canvasWidth = 4000;
-        const int canvasHeight = 1250;
-        const float minFontSize = 45f;
-        const float maxFontSize = 280f;
-        const float paddingX = 140f;
-        const float paddingY = 80f;
-
-        float maxTextWidth = canvasWidth - paddingX * 2;
-        float maxTextHeight = canvasHeight - paddingY * 2;
-
-        var imageInfo = new SKImageInfo(canvasWidth, canvasHeight, SKColorType.Rgba8888, SKAlphaType.Premul);
-        using var surface = SKSurface.Create(imageInfo);
-        var canvas = surface.Canvas;
-
-        canvas.Clear(new SKColor(0x18, 0x18, 0x1c, 0xeb));
-
-        var paint = new SKPaint
-        {
-            Color = SKColors.White,
-            IsAntialias = true,
-            TextAlign = SKTextAlign.Center,
-        };
-
-        // Binary search for largest font size where wrapped lines fit in both width and height
-        float low = minFontSize;
-        float high = maxFontSize;
-        float bestFontSize = minFontSize;
-        List<string> bestLines = null;
-
-        for (int iter = 0; iter < 12; iter++)
-        {
-            float mid = (low + high) / 2f;
-            var lines = WrapText(text, mid, maxTextWidth, paint, noSpaceLanguage);
-            float lineHeight = mid * 1.3f;
-            float totalHeight = lines.Count * lineHeight;
-
-            if (totalHeight <= maxTextHeight)
-            {
-                bestFontSize = mid;
-                bestLines = lines;
-                low = mid + 1f;
-            }
-            else
-            {
-                high = mid - 1f;
-            }
-        }
-
-        if (bestLines == null)
-        {
-            bestFontSize = minFontSize;
-            bestLines = WrapText(text, bestFontSize, maxTextWidth, paint, noSpaceLanguage);
-        }
-
-        // If at minFontSize it still exceeds maxTextHeight, limit lines and prepend clean ellipsis
-        float finalLineHeight = bestFontSize * 1.3f;
-        int maxAllowedLines = Math.Max(1, (int)(maxTextHeight / finalLineHeight));
-
-        if (bestLines.Count > maxAllowedLines)
-        {
-            int skip = bestLines.Count - maxAllowedLines;
-            var truncated = bestLines.Skip(skip).ToList();
-            if (truncated.Count > 0 && !truncated[0].StartsWith("..."))
-            {
-                truncated[0] = "..." + truncated[0];
-            }
-            bestLines = truncated;
-        }
-
-        float totalBlockHeight = bestLines.Count * finalLineHeight;
-        float centerX = canvasWidth / 2f;
-        float centerY = canvasHeight / 2f;
-        float startY = centerY - totalBlockHeight / 2f + (bestFontSize * 1.05f);
-
-        for (int i = 0; i < bestLines.Count; i++)
-        {
-            float y = startY + i * finalLineHeight;
-            DrawTextWithFallback(canvas, bestLines[i], centerX, y, paint, bestFontSize);
-        }
-
-        var image = surface.Snapshot();
-        var data = image.Encode(SKEncodedImageFormat.Jpeg, 90);
-
-        return data.ToArray();
-    }
-    
-    public void DrawTextWithFallback(SKCanvas canvas, string text, float x, float y, SKPaint paint, float fontSize)
-    {
-        var fontManager = SKFontManager.Default;
-        var style = new SKFontStyle(
-            paint.FakeBoldText ? SKFontStyleWeight.Bold : SKFontStyleWeight.Normal,
-            SKFontStyleWidth.Normal,
-            SKFontStyleSlant.Upright);
-        
-        float totalWidth = 0f;
-        var charData = new List<(string ch, SKTypeface typeface)>();
-
-        foreach (var c in text)
-        {
-            var typeface = fontManager.MatchCharacter(null, style, null, c) ?? SKTypeface.FromFamilyName("Arial Unicode MS");
-
-            var charStr = c.ToString();
-            using var measurePaint = paint.Clone();
-            measurePaint.Typeface = typeface;
-            measurePaint.TextSize = fontSize;
-            measurePaint.TextAlign = SKTextAlign.Left;
-
-            totalWidth += measurePaint.MeasureText(charStr);
-            charData.Add((charStr, typeface));
-        }
-        
-        float cursorX = x - totalWidth / 2f;
-
-        foreach (var (charStr, typeface) in charData)
-        {
-            using var charPaint = paint.Clone();
-            charPaint.Typeface = typeface;
-            charPaint.TextSize = fontSize;
-            charPaint.TextAlign = SKTextAlign.Left;
-
-            canvas.DrawText(charStr, cursorX, y, charPaint);
-            cursorX += charPaint.MeasureText(charStr);
-        }
-    }
-
-    private float MeasureWidthWithFallback(string text, float fontSize, SKPaint paint)
-    {
-        var fontManager = SKFontManager.Default;
-        var style = new SKFontStyle(
-            paint.FakeBoldText ? SKFontStyleWeight.Bold : SKFontStyleWeight.Normal,
-            SKFontStyleWidth.Normal,
-            SKFontStyleSlant.Upright);
-
-        float totalWidth = 0f;
-        foreach (var c in text)
-        {
-            var typeface = fontManager.MatchCharacter(null, style, null, c)
-                           ?? SKTypeface.FromFamilyName("Arial Unicode MS");
-
-            using var measurePaint = paint.Clone();
-            measurePaint.Typeface = typeface;
-            measurePaint.TextSize = fontSize;
-            measurePaint.TextAlign = SKTextAlign.Left;
-
-            totalWidth += measurePaint.MeasureText(c.ToString());
-        }
-        return totalWidth;
-    }
-
-    private float MeasureHeightWithFallback(string text, float fontSize, SKPaint paint)
-    {
-        var fontManager = SKFontManager.Default;
-        var style = new SKFontStyle(
-            paint.FakeBoldText ? SKFontStyleWeight.Bold : SKFontStyleWeight.Normal,
-            SKFontStyleWidth.Normal,
-            SKFontStyleSlant.Upright);
-
-        float maxAscent = 0f, maxDescent = 0f;
-        var seen = new HashSet<SKTypeface>();
-
-        foreach (var c in text)
-        {
-            var typeface = fontManager.MatchCharacter(null, style, null, c)
-                           ?? SKTypeface.FromFamilyName("Arial Unicode MS");
-            if (!seen.Add(typeface)) continue;
-
-            using var f = new SKFont(typeface, fontSize);
-            f.GetFontMetrics(out var m);
-            maxAscent = Math.Max(maxAscent, Math.Abs(m.Ascent));
-            maxDescent = Math.Max(maxDescent, Math.Abs(m.Descent));
-        }
-
-        return maxAscent + maxDescent;
     }
 }

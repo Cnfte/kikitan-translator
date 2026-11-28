@@ -6,6 +6,7 @@ let stateCallback: ((state: app_state) => void) | null = null;
 let microphoneChangedCallback: (() => void) | null = null;
 let notificationCallback: ((msg: string, level: number) => void) | null = null;
 let windowStateCallback: ((state: string) => void) | null = null;
+let updateProgressCallback: ((data: { percent: number; status: string; error?: string | null }) => void) | null = null;
 const requestCallbacks = new Map<string, (data: any) => void>();
 
 export function init() {
@@ -53,6 +54,10 @@ export function init() {
             return;
         } else if (response.method == "notification") {
             notificationCallback?.(data.msg, data.level);
+
+            return;
+        } else if (response.method == "update_progress") {
+            updateProgressCallback?.(data);
 
             return;
         }
@@ -134,6 +139,14 @@ export function manualTranslate(data: string) {
     window.external.sendMessage(JSON.stringify({
         method: "manual_translate",
         data
+    }));
+}
+
+export function overlayAction(action: "preview" | "clear") {
+    // @ts-ignore
+    window.external.sendMessage(JSON.stringify({
+        method: "overlay_action",
+        data: action
     }));
 }
 
@@ -242,6 +255,10 @@ export function getWindowState() {
 
 export function registerWindowStateCallback(callback: (state: string) => void) {
     windowStateCallback = callback;
+}
+
+export function registerUpdateProgressCallback(callback: (data: { percent: number; status: string; error?: string | null }) => void) {
+    updateProgressCallback = callback;
 }
 
 export function sendUiDebugLog(data: string) {

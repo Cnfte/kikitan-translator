@@ -1,0 +1,2 @@
+VERSION=2.3.0
+RELEASES_URL=https://v4.gh-proxy.org/https://github.com/Cnfte/kikitan-translator/releases/download/v2.3.0/KikitanTranslator-Setup-v2.3.0.exe

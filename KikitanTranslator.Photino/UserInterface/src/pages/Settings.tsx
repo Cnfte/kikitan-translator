@@ -18,10 +18,11 @@ import {
     Router as ProxyIcon,
     DarkMode as DarkModeIcon,
     LightMode as LightModeIcon,
+    Refresh as RefreshIcon,
 } from '@mui/icons-material';
 
 import {localization} from "../util/localization";
-import {openURL, overlayAction, setConfig} from "../util/photino.ts";
+import {openURL, overlayAction, requestCheckUpdate, setConfig} from "../util/photino.ts";
 import {app_state} from "../util/constants.ts";
 import ApiSettings from "./settings/ApiSettings";
 import ProxySettings from "./settings/ProxySettings";
@@ -29,6 +30,7 @@ import ProxySettings from "./settings/ProxySettings";
 type SettingsProps = {
     closeCallback: () => void;
     state: app_state;
+    onUpdateFound?: (remoteVersion: string) => void;
 };
 
 function AppleSwitch({ checked, onChange }: { checked: boolean; onChange: (val: boolean) => void }) {
@@ -46,12 +48,44 @@ function AppleSwitch({ checked, onChange }: { checked: boolean; onChange: (val: 
     );
 }
 
-export default function SettingsPage({ closeCallback, state }: SettingsProps) {
+export default function SettingsPage({ closeCallback, state, onUpdateFound }: SettingsProps) {
     const [page, setPage] = React.useState(0);
     const [glossarySrc, setGlossarySrc] = React.useState("");
     const [glossaryTgt, setGlossaryTgt] = React.useState("");
+    const [checkingUpdate, setCheckingUpdate] = React.useState(false);
+    const [updateCheckMsg, setUpdateCheckMsg] = React.useState<string | null>(null);
+    const [updateCheckTone, setUpdateCheckTone] = React.useState<"neutral" | "success" | "error">("neutral");
     const lang = state.config.language;
     const customGlossary = state.config.custom_glossary ?? [];
+
+    const handleCheckUpdate = () => {
+        if (checkingUpdate) return;
+        setCheckingUpdate(true);
+        setUpdateCheckMsg(null);
+        setUpdateCheckTone("neutral");
+        requestCheckUpdate((res) => {
+            setCheckingUpdate(false);
+            if (!res.ok) {
+                setUpdateCheckTone("error");
+                setUpdateCheckMsg(
+                    localization.update_check_failed[lang].replace("{error}", res.error || "Unknown error")
+                );
+                return;
+            }
+            if (res.has_update && res.remote_version) {
+                setUpdateCheckTone("success");
+                setUpdateCheckMsg(
+                    localization.update_found_short[lang].replace("{version}", res.remote_version)
+                );
+                onUpdateFound?.(res.remote_version);
+                return;
+            }
+            setUpdateCheckTone("success");
+            setUpdateCheckMsg(
+                localization.already_up_to_date[lang].replace("{version}", res.current_version || state.app_version)
+            );
+        });
+    };
 
     const handleAddGlossary = () => {
         const s = glossarySrc.trim();
@@ -142,9 +176,35 @@ export default function SettingsPage({ closeCallback, state }: SettingsProps) {
                     })}
                 </div>
 
-                <div className="px-2 pt-3 border-t apple-divider flex items-center justify-between text-[11px] apple-text-tertiary">
-                    <span>Liquid Glass HIG</span>
-                    <span className="font-mono">v{state.app_version}</span>
+                <div className="px-2 pt-3 border-t apple-divider flex flex-col gap-2">
+                    <div className="flex items-center justify-between text-[11px] apple-text-tertiary">
+                        <span>Kikitan</span>
+                        <span className="font-mono">v{state.app_version}</span>
+                    </div>
+                    <button
+                        type="button"
+                        disabled={checkingUpdate}
+                        onClick={handleCheckUpdate}
+                        className="w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium liquid-glass-clear apple-text-primary hover:bg-white/[0.12] disabled:opacity-50 transition-all cursor-pointer"
+                    >
+                        <RefreshIcon sx={{ fontSize: 14 }} className={checkingUpdate ? "animate-spin" : ""} />
+                        <span>
+                            {checkingUpdate
+                                ? localization.checking_update[lang]
+                                : localization.check_for_updates[lang]}
+                        </span>
+                    </button>
+                    {updateCheckMsg && (
+                        <p className={`text-[10px] leading-snug text-center break-words ${
+                            updateCheckTone === "error"
+                                ? "text-red-400"
+                                : updateCheckTone === "success"
+                                    ? "text-emerald-400"
+                                    : "apple-text-secondary"
+                        }`}>
+                            {updateCheckMsg}
+                        </p>
+                    )}
                 </div>
             </aside>
 
@@ -768,6 +828,39 @@ export default function SettingsPage({ closeCallback, state }: SettingsProps) {
                                         onChange={(val) => setConfig("send_user_data", val)}
                                     />
                                 </div>
+                            </div>
+                            <div className="liquid-glass-regular rounded-2xl p-5 flex items-center justify-between gap-4">
+                                <div className="min-w-0">
+                                    <p className="text-xs font-semibold apple-text-primary">
+                                        {localization.software_update[lang]}
+                                    </p>
+                                    <p className="text-[11px] apple-text-secondary mt-0.5">
+                                        {localization.current_version_label[lang].replace("{version}", state.app_version)}
+                                    </p>
+                                    {updateCheckMsg && (
+                                        <p className={`text-[11px] mt-1 break-words ${
+                                            updateCheckTone === "error"
+                                                ? "text-red-400"
+                                                : updateCheckTone === "success"
+                                                    ? "text-emerald-400"
+                                                    : "apple-text-secondary"
+                                        }`}>
+                                            {updateCheckMsg}
+                                        </p>
+                                    )}
+                                </div>
+                                <Button
+                                    variant="contained"
+                                    size="small"
+                                    disabled={checkingUpdate}
+                                    onClick={handleCheckUpdate}
+                                    className="!bg-[var(--accent-blue)] !text-white !font-semibold !rounded-lg !text-xs !px-3.5 shrink-0"
+                                    startIcon={<RefreshIcon sx={{ fontSize: 15 }} className={checkingUpdate ? "animate-spin" : ""} />}
+                                >
+                                    {checkingUpdate
+                                        ? localization.checking_update[lang]
+                                        : localization.check_for_updates[lang]}
+                                </Button>
                             </div>
                         </div>
                     )}

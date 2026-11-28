@@ -418,10 +418,24 @@ function App() {
                     <div
                         className={'transition-all z-40 w-full h-screen flex backdrop-blur-md bg-black/40 justify-center items-center absolute inset-0' + (settingsVisible ? " opacity-100 pointer-events-auto" : " opacity-0 pointer-events-none")}>
                         <div className="flex flex-col w-[92vw] max-w-[940px] h-[84vh] rounded-3xl liquid-glass-sheet overflow-hidden">
-                            <SettingsPage state={appState} closeCallback={() => {
-                                setSettingsVisible(false);
-                                controlKikitan(true);
-                            }}/>
+                            <SettingsPage
+                                state={appState}
+                                closeCallback={() => {
+                                    setSettingsVisible(false);
+                                    controlKikitan(true);
+                                }}
+                                onUpdateFound={(remoteVersion: string) => {
+                                    updateViewed = false;
+                                    setUpdateError(null);
+                                    setUpdating(false);
+                                    setShowProgress(false);
+                                    setUpdatePercent(0);
+                                    setNewVersion(remoteVersion);
+                                    setUpdaterText(localization.new_update_available[appState.config.language]);
+                                    setAutoCountdown(3);
+                                    setUpdaterVisible(true);
+                                }}
+                            />
                         </div>
                     </div>
 

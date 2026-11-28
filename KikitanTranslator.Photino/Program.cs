@@ -55,6 +55,7 @@ public class Program
         messageHandler.RegisterHandler("quit", new Quit());
         messageHandler.RegisterHandler("open_url", new OpenURL());
         messageHandler.RegisterHandler("update", new UpdateApp(manager));
+        messageHandler.RegisterHandler("check_update", new CheckUpdate(manager));
         messageHandler.RegisterHandler("fetch", new Fetch());
         messageHandler.RegisterHandler("fetch_models", new FetchModels());
         messageHandler.RegisterHandler("test_proxy", new TestProxy());

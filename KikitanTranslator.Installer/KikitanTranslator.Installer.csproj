@@ -9,7 +9,6 @@
     <RootNamespace>KikitanInstaller</RootNamespace>
     <Product>Kikitan Translator Setup</Product>
     <Company>Kikitan</Company>
-    <Version>2.3.0</Version>
     <ApplicationIcon>..\KikitanTranslator.Photino\Resources\wwwroot\kikitan_logo.ico</ApplicationIcon>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>true</SelfContained>

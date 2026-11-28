@@ -1166,4 +1166,46 @@ export const localization = {
     history_resend: { en: "Resend", jp: "再送信", cn: "重发", kr: "재전송" },
     history_export: { en: "Export .txt", jp: "テキスト出力", cn: "导出记录", kr: "내보내기" },
     history_clear: { en: "Clear", jp: "すべて削除", cn: "清空", kr: "모두 삭제" },
+    software_update: {
+        en: "Software Update",
+        jp: "ソフトウェアアップデート",
+        cn: "软件更新",
+        kr: "소프트웨어 업데이트",
+    },
+    check_for_updates: {
+        en: "Check for Updates",
+        jp: "アップデートを確認",
+        cn: "检查更新",
+        kr: "업데이트 확인",
+    },
+    checking_update: {
+        en: "Checking...",
+        jp: "確認中...",
+        cn: "正在检查...",
+        kr: "확인 중...",
+    },
+    already_up_to_date: {
+        en: "Up to date (v{version})",
+        jp: "最新バージョンです (v{version})",
+        cn: "当前已是最新版本 (v{version})",
+        kr: "최신 버전입니다 (v{version})",
+    },
+    update_found_short: {
+        en: "New version available: v{version}",
+        jp: "新しいバージョンがあります: v{version}",
+        cn: "发现新版本: v{version}",
+        kr: "새 버전 사용 가능: v{version}",
+    },
+    update_check_failed: {
+        en: "Update check failed: {error}",
+        jp: "確認に失敗しました: {error}",
+        cn: "检查更新失败: {error}",
+        kr: "업데이트 확인 실패: {error}",
+    },
+    current_version_label: {
+        en: "Current version: v{version}",
+        jp: "現在のバージョン: v{version}",
+        cn: "当前版本: v{version}",
+        kr: "현재 버전: v{version}",
+    },
 };

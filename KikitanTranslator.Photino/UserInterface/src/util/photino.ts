@@ -24,7 +24,7 @@ export function init() {
             microphoneChangedCallback?.();
 
             return;
-        } else if (response.method == "fetch_models" || response.method == "test_proxy") {
+        } else if (response.method == "fetch_models" || response.method == "test_proxy" || response.method == "check_update") {
             const requestResponse = JSON.parse(response.data);
             const requestCallback = requestCallbacks.get(requestResponse.id);
             requestCallbacks.delete(requestResponse.id);
@@ -123,6 +123,19 @@ export type modelsResponse = {
     status?: number;
     error?: string;
     message?: string;
+}
+
+export function requestCheckUpdate(callback: (response: checkUpdateResponse) => void) {
+    sendRequest("check_update", {}, callback as (data: any) => void);
+}
+
+export type checkUpdateResponse = {
+    id: string;
+    ok: boolean;
+    has_update: boolean;
+    current_version: string;
+    remote_version?: string | null;
+    error?: string | null;
 }
 
 export type proxyTestResponse = {

@@ -35,7 +35,7 @@ public static class DependencyManager
 
     static DependencyManager()
     {
-        Http.DefaultRequestHeaders.UserAgent.ParseAdd("KikitanTranslator-Installer/2.3.0");
+        Http.DefaultRequestHeaders.UserAgent.ParseAdd($"KikitanTranslator-Installer/{MainWindow.AppVersion}");
     }
 
     public static List<DependencyItem> CreateDefaults() =>

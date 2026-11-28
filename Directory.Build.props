@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <!-- Single source of truth for all Kikitan Translator projects. Auto-bumped by build-release.ps1 -->
+    <Version>2.3.1</Version>
+  </PropertyGroup>
+</Project>

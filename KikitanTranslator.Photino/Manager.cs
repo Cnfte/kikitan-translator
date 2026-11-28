@@ -34,7 +34,7 @@ public class AppState
     [JsonProperty("microphones")] public Mic[] Microphones;
     [JsonProperty("config")] public ConfigObject Config;
     [JsonProperty("status")] public int Status;
-    [JsonProperty("app_version")] public string AppVersion = "2.3.0";
+    [JsonProperty("app_version")] public string AppVersion = CloudUpdater.CurrentAppVersion;
     [JsonProperty("server_version")] public string? ServerVersion;
     [JsonProperty("changelog_file")] public string ChangelogFile = Constants.DEFAULT_CHANGELOG_FILE;
     [JsonProperty("is_linux")] public bool IsLinux;
@@ -100,11 +100,7 @@ public class Manager
 
         _errorHandler = new ErrorHandler(connector);
         
-        _appState.AppVersion = Assembly.GetEntryAssembly()
-            ?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
-            ?.InformationalVersion?.Split('+')[0]
-            ?? Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3)
-            ?? "2.3.0";
+        _appState.AppVersion = CloudUpdater.CurrentAppVersion;
 
         #if DEBUG
         _loopback = new("Resources/wwwroot/silero_vad.onnx");
@@ -119,17 +115,7 @@ public class Manager
         _connector = connector;
 
         // Cloud update check via gx.txt (VERSION + RELEASES_URL)
-        Task.Run(async () =>
-        {
-            var updateInfo = await CloudUpdater.CheckForUpdateAsync(_appState.AppVersion);
-            if (updateInfo != null)
-            {
-                _pendingUpdate = updateInfo;
-                _appState.ServerVersion = updateInfo.RemoteVersion;
-                _appState.ChangelogFile = updateInfo.ChangelogFile;
-                SendUpdateToUI();
-            }
-        });
+        _ = Task.Run(CheckForUpdateAsync);
         
         AppConfig.OnUpdate += () =>
         {
@@ -515,6 +501,19 @@ public class Manager
                 _errorHandler.OnError($"Manual translation failed: {ex.Message}");
             }
         });
+    }
+
+    public async Task<CloudUpdateCheckResult> CheckForUpdateAsync()
+    {
+        var result = await CloudUpdater.CheckForUpdateDetailedAsync(_appState.AppVersion);
+        if (result.Ok && result.HasUpdate && result.UpdateInfo != null)
+        {
+            _pendingUpdate = result.UpdateInfo;
+            _appState.ServerVersion = result.UpdateInfo.RemoteVersion;
+            _appState.ChangelogFile = result.UpdateInfo.ChangelogFile;
+            SendUpdateToUI();
+        }
+        return result;
     }
 
     public void StartCloudUpdate()

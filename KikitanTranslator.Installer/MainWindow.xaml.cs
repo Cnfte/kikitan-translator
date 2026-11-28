@@ -135,9 +135,18 @@ public partial class MainWindow : Window
     private long _payloadEstimatedBytes = 95L * 1024 * 1024;
     private string _installedDir = string.Empty;
 
+    public static string AppVersion { get; } =
+        Assembly.GetEntryAssembly()
+            ?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+            ?.InformationalVersion?.Split('+')[0]
+        ?? Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3)
+        ?? "0.0.0";
+
     public MainWindow(string? capturePreviewDir = null, string? autoUpdateDir = null)
     {
         InitializeComponent();
+        Title = $"Kikitan Translator v{AppVersion} 安装向导";
+        TxtVersionBadge.Text = $"v{AppVersion}";
         _capturePreviewDir = capturePreviewDir;
         _autoUpdateDir = autoUpdateDir;
 
@@ -740,7 +749,7 @@ public partial class MainWindow : Window
             if (key != null)
             {
                 key.SetValue("DisplayName", "Kikitan Translator");
-                key.SetValue("DisplayVersion", "2.3.0");
+                key.SetValue("DisplayVersion", AppVersion);
                 key.SetValue("Publisher", "Kikitan");
                 key.SetValue("DisplayIcon", mainExePath);
                 key.SetValue("InstallLocation", targetDir);

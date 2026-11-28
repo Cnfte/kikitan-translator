@@ -10,7 +10,7 @@ public class Fetch : IHandler
         try
         {
             using var client = NetworkClientFactory.Create(TimeSpan.FromSeconds(20));
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("KikitanTranslator/2.3.0");
+            client.DefaultRequestHeaders.UserAgent.ParseAdd($"KikitanTranslator/{CloudUpdater.CurrentAppVersion}");
             return await client.GetStringAsync(data);
         }
         catch (Exception e)

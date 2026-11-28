@@ -9,7 +9,6 @@
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
         <ApplicationIcon>Resources/wwwroot/kikitan_logo.ico</ApplicationIcon>
-        <Version>2.3.0</Version>
         <PackageId>KikitanTranslator</PackageId>
         <Title>Kikitan Translator</Title>
     </PropertyGroup>
@@ -47,6 +46,7 @@
     <Target Name="NpmBuild" BeforeTargets="BeforeBuild;BeforeCompile;CoreCompile" Condition="'$(Configuration)' == 'Release'">
         <Exec Command="cmd /c npm run build" WorkingDirectory="$(MSBuildProjectDirectory)/UserInterface" Condition="'$(OS)' == 'Windows_NT'" />
         <Exec Command="npm run build" WorkingDirectory="$(MSBuildProjectDirectory)/UserInterface" Condition="'$(OS)' != 'Windows_NT'" />
+        <RemoveDir Directories="$(MSBuildProjectDirectory)/Resources/wwwroot/assets" />
         <ItemGroup>
             <BuiltDistFiles Include="$(MSBuildProjectDirectory)/UserInterface/dist/**/*" />
         </ItemGroup>

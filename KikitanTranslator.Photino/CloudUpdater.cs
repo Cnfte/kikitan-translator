@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Net.Http;
+using System.Reflection;
 using System.Text;
 using KikitanTranslator.Utility;
 using Serilog;
@@ -11,14 +12,35 @@ public sealed record CloudUpdateInfo(
     string ReleasesUrl,
     string ChangelogFile);
 
+public sealed record CloudUpdateCheckResult(
+    bool Ok,
+    bool HasUpdate,
+    string CurrentVersion,
+    string? RemoteVersion,
+    CloudUpdateInfo? UpdateInfo,
+    string? Error);
+
 public static class CloudUpdater
 {
+    public static string CurrentAppVersion { get; } =
+        Assembly.GetEntryAssembly()
+            ?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+            ?.InformationalVersion?.Split('+')[0]
+        ?? Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3)
+        ?? "0.0.0";
+
     public static async Task<CloudUpdateInfo?> CheckForUpdateAsync(string currentVersion)
+    {
+        var result = await CheckForUpdateDetailedAsync(currentVersion).ConfigureAwait(false);
+        return result.HasUpdate ? result.UpdateInfo : null;
+    }
+
+    public static async Task<CloudUpdateCheckResult> CheckForUpdateDetailedAsync(string currentVersion)
     {
         try
         {
             using var client = NetworkClientFactory.Create(TimeSpan.FromSeconds(15));
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("KikitanTranslator-Updater/2.3.0");
+            client.DefaultRequestHeaders.UserAgent.ParseAdd($"KikitanTranslator-Updater/{CurrentAppVersion}");
             client.DefaultRequestHeaders.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue { NoCache = true };
 
             var url = $"{Constants.CLOUD_UPDATE_MANIFEST_URL}?t={DateTimeOffset.UtcNow.ToUnixTimeSeconds()}";
@@ -27,8 +49,9 @@ public static class CloudUpdater
             using var resp = await client.GetAsync(url).ConfigureAwait(false);
             if (!resp.IsSuccessStatusCode)
             {
-                Log.Warning($"[UPD] Manifest check failed with HTTP {(int)resp.StatusCode}");
-                return null;
+                var statusErr = $"HTTP {(int)resp.StatusCode}";
+                Log.Warning($"[UPD] Manifest check failed with {statusErr}");
+                return new CloudUpdateCheckResult(false, false, currentVersion, null, null, statusErr);
             }
 
             var text = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
@@ -36,18 +59,18 @@ public static class CloudUpdater
             if (parsed == null)
             {
                 Log.Warning("[UPD] Manifest missing valid VERSION or RELEASES_URL");
-                return null;
+                return new CloudUpdateCheckResult(false, false, currentVersion, null, null, "gx.txt 格式无效");
             }
 
             bool hasNewer = IsNewerVersion(parsed.RemoteVersion, currentVersion);
             Log.Information($"[UPD] Version check: local={currentVersion}, remote={parsed.RemoteVersion}, hasUpdate={hasNewer}");
 
-            return hasNewer ? parsed : null;
+            return new CloudUpdateCheckResult(true, hasNewer, currentVersion, parsed.RemoteVersion, hasNewer ? parsed : null, null);
         }
         catch (Exception ex)
         {
             Log.Warning($"[UPD] Cloud update check failed: {ex.Message}");
-            return null;
+            return new CloudUpdateCheckResult(false, false, currentVersion, null, null, ex.Message);
         }
     }
 
@@ -139,7 +162,7 @@ public static class CloudUpdater
             Directory.CreateDirectory(updateDir);
 
             using var client = NetworkClientFactory.Create(TimeSpan.FromMinutes(15));
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("KikitanTranslator-Updater/2.3.0");
+            client.DefaultRequestHeaders.UserAgent.ParseAdd($"KikitanTranslator-Updater/{CurrentAppVersion}");
 
             using var response = await client.GetAsync(info.ReleasesUrl, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
